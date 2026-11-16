@@ -2216,14 +2216,21 @@
 }
 
 .footer {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px 20px;
-  border-radius: var(--radius-md);
+  padding: 20px var(--space-md) max(20px, env(safe-area-inset-bottom));
+  margin-top: auto;
   background-color: var(--color-ink);
   color: var(--color-on-ink);
   font-size: 13px;
+}
+
+@media (max-width: 767px) {
+  .page--has-bottom-bar + .footer {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom));
+  }
 }
 
 .footer-link {

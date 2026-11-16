@@ -178,44 +178,46 @@ function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
   };
 
   return (
-    <div className="page page--narrow">
-      <main className="login-shell">
-        <header className="page-header">
-          <div className="login-brand">
-            <ChipLogoIcon size={24} />
-            <span>CPE 411 · Microprocessor &amp; Embedded Systems</span>
-          </div>
-          <h1 className="login-title">Sign in to your group</h1>
-          <p className="page-subtitle">
-            Enter your registration number to view your assigned group and select your subtopic and role.
-          </p>
-        </header>
+    <>
+      <div className="page page--narrow">
+        <main className="login-shell">
+          <header className="page-header">
+            <div className="login-brand">
+              <ChipLogoIcon size={24} />
+              <span>CPE 411 · Microprocessor &amp; Embedded Systems</span>
+            </div>
+            <h1 className="login-title">Sign in to your group</h1>
+            <p className="page-subtitle">
+              Enter your registration number to view your assigned group and select your subtopic and role.
+            </p>
+          </header>
 
-        <Card padding="lg">
-          <form onSubmit={submit} className="login-form">
-            <Input
-              label="Registration Number"
-              value={regNo}
-              onChange={(e) => {
-                setRegNo(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder="e.g. 22/EG/CO/1631"
-              autoComplete="off"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              enterKeyHint="go"
-              error={error ?? undefined}
-              required
-            />
-            <Button type="submit" variant="primary" size="lg" fullWidth>
-              Continue to my group
-            </Button>
-          </form>
-        </Card>
-      </main>
+          <Card padding="lg">
+            <form onSubmit={submit} className="login-form">
+              <Input
+                label="Registration Number"
+                value={regNo}
+                onChange={(e) => {
+                  setRegNo(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="e.g. 22/EG/CO/1631"
+                autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                enterKeyHint="go"
+                error={error ?? undefined}
+                required
+              />
+              <Button type="submit" variant="primary" size="lg" fullWidth>
+                Continue to my group
+              </Button>
+            </form>
+          </Card>
+        </main>
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }
 
@@ -225,80 +227,81 @@ function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
 
 function GroupsList({ session, onLogout }: { session: Session; onLogout: () => void }) {
   return (
-    <div className="page">
-      <Navbar
-        brandLabel="CPE 411"
-        studentName={session.name}
-        studentRegNo={session.regNo}
-        actions={
-          <Button variant="secondary" size="sm" onClick={() => navigate(`/group${session.groupId}`)}>
-            My group
-          </Button>
-        }
-        onLogout={onLogout}
-      />
+    <>
+      <div className="page">
+        <Navbar
+          brandLabel="CPE 411"
+          studentName={session.name}
+          studentRegNo={session.regNo}
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(`/group${session.groupId}`)}>
+              My group
+            </Button>
+          }
+          onLogout={onLogout}
+        />
 
-      <main className="page-main">
-        <header className="page-header">
-          <h1 className="page-title">Course Groupings</h1>
-          <p className="page-subtitle">
-            Browse all {groups.length} project groups. You can edit your own subtopic and role inside Group{" "}
-            {session.groupId}.
-          </p>
-        </header>
+        <main className="page-main">
+          <header className="page-header">
+            <h1 className="page-title">Course Groupings</h1>
+            <p className="page-subtitle">
+              Browse all {groups.length} project groups. You can edit your own subtopic and role inside Group{" "}
+              {session.groupId}.
+            </p>
+          </header>
 
-        <div className="groups-grid">
-          {groups.map((g) => {
-            const topic = topics.find((t) => t.id === g.id)!;
-            const mine = g.id === session.groupId;
-            return (
-              <button
-                key={g.id}
-                type="button"
-                className={`folder-card ${mine ? "is-mine" : ""}`}
-                onClick={() => navigate(`/group${g.id}`)}
-              >
-                <span className="folder-pocket" aria-hidden="true">
-                  <span className="folder-doc-back" />
-                  <span className="folder-doc">
-                    <span className="folder-doc-kicker">Course content</span>
-                    {topic.subtopics.slice(0, 3).map((sub, idx) => (
-                      <span key={idx} className="folder-doc-line">
-                        <span className="folder-doc-idx mono">{idx + 1}</span>
-                        <span className="folder-doc-text">{sub}</span>
+          <div className="groups-grid">
+            {groups.map((g) => {
+              const topic = topics.find((t) => t.id === g.id)!;
+              const mine = g.id === session.groupId;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`folder-card ${mine ? "is-mine" : ""}`}
+                  onClick={() => navigate(`/group${g.id}`)}
+                >
+                  <span className="folder-pocket" aria-hidden="true">
+                    <span className="folder-doc-back" />
+                    <span className="folder-doc">
+                      <span className="folder-doc-kicker">Course content</span>
+                      {topic.subtopics.slice(0, 3).map((sub, idx) => (
+                        <span key={idx} className="folder-doc-line">
+                          <span className="folder-doc-idx mono">{idx + 1}</span>
+                          <span className="folder-doc-text">{sub}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+
+                  <span className="folder-flap">
+                    <svg
+                      className="folder-flap-curve"
+                      viewBox="0 0 320 28"
+                      preserveAspectRatio="none"
+                      aria-hidden="true"
+                    >
+                      <path d="M0,16 C0,6 8,0 20,0 L118,0 C138,0 146,16 170,16 L304,16 C314,16 320,21 320,28 L0,28 Z" />
+                    </svg>
+                    <span className="folder-flap-content">
+                      <span className="folder-body-head">
+                        <span className="folder-num">{g.name}</span>
+                        {mine && <Badge tone="primary">My group</Badge>}
                       </span>
-                    ))}
-                  </span>
-                </span>
-
-                <span className="folder-flap">
-                  <svg
-                    className="folder-flap-curve"
-                    viewBox="0 0 320 28"
-                    preserveAspectRatio="none"
-                    aria-hidden="true"
-                  >
-                    <path d="M0,16 C0,6 8,0 20,0 L118,0 C138,0 146,16 170,16 L304,16 C314,16 320,21 320,28 L0,28 Z" />
-                  </svg>
-                  <span className="folder-flap-content">
-                    <span className="folder-body-head">
-                      <span className="folder-num">{g.name}</span>
-                      {mine && <Badge tone="primary">My group</Badge>}
-                    </span>
-                    <span className="folder-topic">{topic.title}</span>
-                    <span className="folder-meta tabular">
-                      {g.students.length} students · {topic.subtopics.length} subtopics
+                      <span className="folder-topic">{topic.title}</span>
+                      <span className="folder-meta tabular">
+                        {g.students.length} students · {topic.subtopics.length} subtopics
+                      </span>
                     </span>
                   </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </main>
-
+                </button>
+              );
+            })}
+          </div>
+        </main>
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }
 
@@ -550,7 +553,8 @@ function GroupPage({
   const savedRoleMeta = getRoleMeta(myRow?.roleId ?? null);
 
   return (
-    <div className="page page--has-bottom-bar">
+    <>
+      <div className="page page--has-bottom-bar">
       <Navbar
         brandLabel="CPE 411"
         onBrandClick={() => navigate("/")}
@@ -1157,9 +1161,9 @@ function GroupPage({
           />
         )}
       </main>
-
-      <Footer />
-      <Toast toast={toast} onDismiss={() => setToast(null)} />
+    </div>
+    <Footer />
+    <Toast toast={toast} onDismiss={() => setToast(null)} />
 
       {/* Mobile Floating "All groups" FAB above Bottom Bar */}
       <button
@@ -1200,7 +1204,7 @@ function GroupPage({
           <span>Materials</span>
         </button>
       </nav>
-    </div>
+    </>
   );
 }
 
