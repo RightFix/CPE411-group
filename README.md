@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CPE 411 — Group 1 Presentation & Project Grouping
 
-## Getting Started
+Simple React + Express app with a Postgres database (Render-compatible) for 37 students to pick subtopics and roles.
 
-First, run the development server:
+## Rules
+- 5 subtopics, each with **1 Presenter, 3 Researchers, 3 Slide Creators** (35 seats total).
+- Students are shown in a table sorted by **registration number**.
+- Name + registration number must match the roster. Matching ignores case, spacing, punctuation, and name order.
+- Seats are first-come, first-served. If all 35 are taken, remaining students see that no seats are available (but can claim a seat if one is released).
+- Students can change to another free seat or release their seat (with confirmation). Selections stay open.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Subtopics
+- **a. Definition & Characteristics** — Definition and characteristics of embedded systems.
+- **b. MPU vs. MCU** — Classification: Microprocessors (MPU) vs. Microcontrollers (MCU).
+- **c. Application Domains** — Consumer electronics, automotive, industrial automation, IoT, and medical devices.
+- **d. Design Flow** — Specification → Design → Implementation → Testing.
+- **e. General-Purpose vs. Embedded** — Guardrail: Differentiate clearly between general-purpose computing (PCs) and embedded computing constraints (power, cost, real-time).
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Setup
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create `.env` from `.env.example` and set your Render Postgres URL:
+   ```env
+   DATABASE_URL=postgres://USER:PASSWORD@HOST:PORT/DBNAME
+   PORT=3000
+   ```
+   For Render external connections, SSL is enabled automatically (with `rejectUnauthorized: false`) unless the URL contains `sslmode=disable` or points to localhost.
+3. Ensure the schema/table exists:
+   ```bash
+   npm run db:seed
+   ```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Run
+- Development (recommended): run API and frontend in two terminals
+  ```bash
+  npm run dev:server   # http://localhost:3000 (API + serves dist if built)
+  npm run dev          # Vite dev server, proxies /api to :3000
+  ```
+- Production:
+  ```bash
+  npm run build
+  npm start            # serves API and built frontend on PORT
+  ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
+- `npm run db:seed` — create the `selections` table if missing.
+- `npm run db:reset -- --confirm` — clear all selections.
+- `npm run db:export` — export `selections-export.csv` (sorted by registration number).
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- Student names and subtopics are defined in `src/data/students.ts` and `src/data/subtopics.ts`.
+- Identification is by name + reg number only (no authentication). The page is public to anyone with the link and marked `noindex`.
+- Deploy anywhere you can run a Node server with access to the Render Postgres database (set `DATABASE_URL` and `PORT`). Build with `npm run build` and run with `npm start`.

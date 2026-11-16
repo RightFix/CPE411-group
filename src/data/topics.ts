@@ -1,0 +1,66 @@
+export type Topic = { id: number; title: string; subtopics: string[] };
+
+export const topics: Topic[] = [
+  { id: 1, title: "Introduction to Microprocessor and Embedded Systems", subtopics: [
+    "Definition and characteristics of embedded systems.",
+    "Classification: Microprocessors (MPU) vs. Microcontrollers (MCU).",
+    "Application domains: Consumer electronics, automotive, industrial automation, IoT, and medical devices.",
+    "Overview of the embedded system design flow (Specification → Design → Implementation → Testing).",
+    "Guardrail: Differentiate clearly between general-purpose computing (PCs) and embedded computing constraints (power, cost, real-time).",
+  ]},
+  { id: 2, title: "Microprocessor Architecture (Case Study: ARM Cortex-M / 8086)", subtopics: [
+    "Von Neumann vs. Harvard Architecture.",
+    "RISC vs. CISC instruction set philosophies.",
+    "Internal organization: ALU, Control Unit, Registers, Bus Interface.",
+    "The ARM Cortex-M architecture overview (Registers, Stack Pointer, Link Register, Program Counter).",
+    "Memory map and address space organization.",
+    "Guardrail: Focus on the architectural features relevant to programming (register set, stack behavior) rather than deep silicon-level physics.",
+  ]},
+  { id: 3, title: "Assembly Language Programming & Instruction Set", subtopics: [
+    "Instruction formats: Data movement, arithmetic, logical, and branching.",
+    "Addressing modes (Immediate, Direct, Indirect, Indexed).",
+    "Writing simple assembly routines (e.g., delay loops, arithmetic operations).",
+    "The role of the Assembler and Linker.",
+    "Guardrail: Emphasize reading and writing basic assembly; extensive assembly programming is not required, as the focus shifts to C for complex tasks.",
+  ]},
+  { id: 4, title: "Embedded C Programming and Development Environment", subtopics: [
+    "Data types, pointers, and bit-wise operations in C for embedded systems.",
+    "Using volatile and const keywords in hardware register access.",
+    "Introduction to toolchains (Compiler, Debugger, IDE).",
+    "Practical: Setting up a development environment (e.g., Keil, STM32CubeIDE, or Arduino IDE) and compiling a \"Blinky\" program (GPIO control).",
+    "Guardrail: Students must demonstrate proficiency in using a debugger (breakpoints, step-through) as part of the lab assessment.",
+  ]},
+  { id: 5, title: "General Purpose Input/Output (GPIO) and Interfacing", subtopics: [
+    "GPIO Port configuration (Input, Output, Alternate Function).",
+    "Electrical characteristics: Current sinking/sourcing, pull-up/pull-down resistors.",
+    "Interfacing with simple outputs (LEDs, Buzzers) and inputs (Push-buttons, Switches).",
+    "Switch debouncing (Hardware vs. Software).",
+    "Guardrail: Circuit safety is paramount; students must calculate and use appropriate current-limiting resistors to prevent MCU damage.",
+  ]},
+  { id: 6, title: "Interrupts, Timers, and Counters", subtopics: [
+    "Polling vs. Interrupt-driven I/O.",
+    "Interrupt vector table, ISR (Interrupt Service Routine) design, and latency.",
+    "Configuring hardware timers for precise delays and periodic interrupts.",
+    "Pulse Width Modulation (PWM) for motor speed and LED dimming control.",
+    "Guardrail: ISRs must be kept short; heavy processing should be deferred to the main loop. Global variables shared with ISRs must be declared volatile.",
+  ]},
+  { id: 7, title: "Serial Communication Protocols (UART, SPI, I²C)", subtopics: [
+    "UART: Baud rate, framing, and PC communication.",
+    "I²C: Master/Slave addressing, START/STOP conditions, and clock stretching.",
+    "SPI: Master/Slave configuration, MOSI/MISO/SCK/CS lines, and data rates.",
+    "Interfacing with sensors (e.g., I²C temperature sensor) and displays (e.g., SPI OLED).",
+    "Guardrail: Logic level compatibility must be verified; students must not connect 5V devices directly to 3.3V MCU pins without level shifting.",
+  ]},
+  { id: 8, title: "Analog Interfacing and Sensors", subtopics: [
+    "Analog-to-Digital Converter (ADC) principles: Resolution, sampling rate, reference voltage.",
+    "Reading analog sensors (e.g., potentiometers, LM35 temperature sensors, LDRs).",
+    "Sensor calibration and noise mitigation techniques (averaging, filtering).",
+    "Guardrail: Analog input voltages must not exceed the MCU's VDD (e.g., 3.3V). Students must use voltage dividers where necessary.",
+  ]},
+  { id: 9, title: "Embedded System Design, RTOS, and IoT Integration", subtopics: [
+    "Introduction to Real-Time Operating Systems (RTOS): Tasks, scheduling, and context switching.",
+    "Power management techniques (Sleep modes, clock gating) for battery-operated devices.",
+    "Basic IoT architecture: Connecting an MCU to a network (Wi-Fi/Bluetooth module) and sending data to a cloud platform.",
+    "Guardrail: For IoT projects, students must explicitly address data security (e.g., basic authentication) and avoid exposing hardcoded credentials in public repositories.",
+  ]},
+];
