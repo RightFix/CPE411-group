@@ -14,8 +14,10 @@ type Row = Student & { subtopicIndex: number | null; roleId: RoleId | null };
 
 async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as any).error || "Request failed");
+  const text = await res.text();
+  let data: any = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text || "Request failed" }; }
+  if (!res.ok) throw new Error(data?.error || `Request failed (${res.status})`);
   return data as T;
 }
 
@@ -88,10 +90,13 @@ function GroupPage({ groupId }: { groupId: number }) {
 
   const persist = async (sn: number, subtopicIndex: number | null, roleId: RoleId | null) => {
     try {
+      setStatus("Saving…");
       await api(`/api/groups/${groupId}/selections`, { method: "POST", body: JSON.stringify({ studentSn: sn, subtopicIndex, roleId }) });
-      setStatus(null);
+      setStatus("Saved.");
+      setTimeout(() => setStatus(s => (s === "Saved." ? null : s)), 1500);
     } catch (e: any) {
-      setStatus(e.message || "Failed to save");
+      setStatus(`Not saved: ${e.message || "Failed to save"}. Check that the server/API is running and DB_URI is set.`);
+      console.error(e);
     }
   };
 
