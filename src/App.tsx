@@ -50,7 +50,11 @@ function navigate(to: string) {
 }
 
 function Footer() {
-  return <footer className="footer">Powered by RightFix</footer>;
+  return (
+    <footer className="footer">
+      <a href="https://github.com/RightFix/CPE411-group" target="_blank" rel="noopener noreferrer">Powered by RightFix</a>
+    </footer>
+  );
 }
 
 function getGroupIdFromPath() {
