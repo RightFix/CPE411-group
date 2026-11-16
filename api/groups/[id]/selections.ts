@@ -104,7 +104,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const studentSn = Number(body.studentSn);
       const subtopicIndex = body.subtopicIndex == null || body.subtopicIndex === "" ? null : Number(body.subtopicIndex);
       const roleId = body.roleId == null || body.roleId === "" ? null : String(body.roleId);
-      if (!group.students.some(s => s.sn === studentSn)) return res.status(400).json({ error: "Student not found in this group." });
+      const regNoRaw = String(body.regNo || "").trim().toLowerCase();
+      if (!regNoRaw) return res.status(401).json({ error: "Login required." });
+      const student = group.students.find(s => s.sn === studentSn);
+      if (!student) return res.status(400).json({ error: "Student not found in this group." });
+      if (student.regNo.trim().toLowerCase() !== regNoRaw) {
+        return res.status(403).json({ error: "You can only edit your own selection." });
+      }
       if (subtopicIndex != null && (!Number.isInteger(subtopicIndex) || subtopicIndex < 0 || subtopicIndex >= topic.subtopics.length)) {
         return res.status(400).json({ error: "Invalid subtopic." });
       }

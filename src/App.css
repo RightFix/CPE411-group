@@ -66,6 +66,15 @@ tr.hl { background: #f3f4f6; }
 .subtopic-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 260px; max-width: min(520px, 90vw); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; display: grid; gap: 4px; }
 .subtopic-option { background: #fff; color: var(--ink); border: 1px solid transparent; border-radius: 8px; padding: 8px 10px; text-align: left; font-weight: 500; cursor: pointer; white-space: normal; }
 .subtopic-option:hover, .subtopic-option.active { background: #f3f4f6; border-color: #d1d5db; }
+.footer { text-align: center; color: var(--muted); padding: 24px 0 8px; font-size: .9rem; }
+.login-card { max-width: 520px; margin: 0 auto 16px; }
+.login-form { display: grid; gap: 12px; }
+.hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.user-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.user-tag { font-size: .9rem; color: var(--muted); font-weight: 600; }
+.readonly-val { display: inline-block; padding: 6px 2px; color: var(--ink); }
+tr.mine { background: #f9fafb; }
+.you { display: inline-block; margin-left: 6px; font-size: .75rem; font-weight: 700; color: #fff; background: #374151; padding: 2px 7px; border-radius: 999px; vertical-align: middle; }
 @media (max-width: 720px) {
   table, thead, tbody, th, tr { display: block; }
   thead { display: none; }
@@ -73,4 +82,5 @@ tr.hl { background: #f3f4f6; }
   td { display: grid; grid-template-columns: 110px 1fr; gap: 8px; border: none; padding: 6px 0; align-items: start; }
   td::before { content: attr(data-label); font-weight: 700; color: var(--muted); font-size: .85rem; }
   .subtopic-menu { position: static; grid-column: 1 / -1; min-width: 0; max-width: 100%; width: 100%; margin-top: 6px; box-shadow: none; }
+  .hero-top { flex-direction: column; }
 }

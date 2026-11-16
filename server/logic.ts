@@ -35,12 +35,19 @@ export async function setGroupSelection(
   groupId: number,
   studentSn: number,
   subtopicIndex: number | null,
-  roleId: string | null
+  roleId: string | null,
+  regNo?: string
 ) {
   const group = groups.find(g => g.id === groupId);
   const topic = topics.find(t => t.id === groupId);
   if (!group || !topic) return { status: 404, body: { error: "Group not found." } };
-  if (!group.students.some(s => s.sn === studentSn)) return { status: 400, body: { error: "Student not found in this group." } };
+  const regNoNorm = String(regNo || "").trim().toLowerCase();
+  if (!regNoNorm) return { status: 401, body: { error: "Login required." } };
+  const student = group.students.find(s => s.sn === studentSn);
+  if (!student) return { status: 400, body: { error: "Student not found in this group." } };
+  if (student.regNo.trim().toLowerCase() !== regNoNorm) {
+    return { status: 403, body: { error: "You can only edit your own selection." } };
+  }
   if (subtopicIndex != null && (!Number.isInteger(subtopicIndex) || subtopicIndex < 0 || subtopicIndex >= topic.subtopics.length)) {
     return { status: 400, body: { error: "Invalid subtopic." } };
   }
