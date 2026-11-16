@@ -1,4 +1,141 @@
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #f5f5f5; }
-#root { min-height: 100vh; }
+:root {
+  color-scheme: light;
+
+  /* Core Colors (CPE 411 — Groupings Design System) */
+  --color-primary: #0067f5;
+  --color-primary-bright: #1a7aff;
+  --color-primary-deep: #0052c4;
+  --color-on-primary: #fffefa;
+
+  --color-ink: #2d241b;
+  --color-ink-soft: #56584f;
+  --color-on-ink: #eaece2;
+
+  --color-canvas: #f8f7f4;
+  --color-paper: #fffefa;
+  --color-cloud: #f4f3ee;
+
+  --color-hairline: #eaece2;
+  --color-hairline-strong: #e5e4df;
+
+  --color-link: #2d241b;
+  --color-link-pressed: #292a26;
+
+  /* Pastel Accent Tags */
+  --color-tag-violet: #eeecf7;
+  --color-tag-blue: #e6f0f6;
+  --color-tag-green: #e5f2e8;
+  --color-tag-subtle-green: #8a9a7b;
+  --color-tag-grey: #a3a69a;
+
+  /* Semantic Status */
+  --color-error: #b42318;
+  --color-error-bg: #fef3f2;
+  --color-success: #166534;
+  --color-success-bg: #e5f2e8;
+
+  /* Typography */
+  --font-display: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Radii */
+  --radius-none: 0px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 36px;
+  --radius-pill: 9999px;
+
+  /* Spacing */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+
+  /* Shadows */
+  --shadow-none: none;
+  --shadow-soft-lift: rgba(41, 42, 38, 0.05) 0px 1px 2px 0px, rgba(41, 42, 38, 0.06) 0px 4px 12px 0px;
+  --shadow-card: rgba(41, 42, 38, 0.06) 0px 2px 6px 0px, rgba(41, 42, 38, 0.1) 0px 12px 28px 0px;
+  --shadow-modal: rgba(41, 42, 38, 0.1) 0px 8px 24px 0px, rgba(41, 42, 38, 0.16) 0px 32px 64px 0px;
+
+  /* Motion (Emil Kowalski ease-out, <300ms for UI) */
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Focus: Outline only, no rings */
+  --focus-outline: 2px solid var(--color-primary);
+  --focus-offset: 2px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  caret-color: var(--color-primary);
+}
+
+::selection {
+  background-color: rgba(0, 103, 245, 0.14);
+  color: var(--color-ink);
+}
+
+#root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  color: var(--color-ink);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--color-link);
+}
+
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-offset);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
