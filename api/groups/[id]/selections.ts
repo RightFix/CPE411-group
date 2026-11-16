@@ -16,8 +16,20 @@ let dataCache: { groups: Group[]; topics: Topic[] } | null = null;
 
 function getPool() {
   if (!pool) {
-    const connectionString = process.env.DB_URI || process.env.DATABASE_URL || "";
+    const connectionString = (process.env.DB_URI || process.env.DATABASE_URL || "").trim();
     if (!connectionString) throw new Error("DB_URI is not set");
+    if (!/^postgres(ql)?:\/\//i.test(connectionString)) {
+      throw new Error("DB_URI must start with postgresql:// or postgres:// (check your Vercel environment variable)");
+    }
+    try {
+      const u = new URL(connectionString);
+      if (!u.hostname || u.hostname === "base") {
+        throw new Error("DB_URI host is invalid. Verify the full Supabase connection string in Vercel env vars.");
+      }
+    } catch (e: any) {
+      if (String(e?.message || "").includes("DB_URI")) throw e;
+      throw new Error("DB_URI is malformed. Ensure it is a valid Supabase connection string.");
+    }
     const needsSsl = !/sslmode=disable/i.test(connectionString) && !/localhost|127\.0\.0\.1/.test(connectionString);
     pool = new pg.Pool({
       connectionString,
