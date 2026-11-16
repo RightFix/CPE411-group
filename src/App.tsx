@@ -53,6 +53,51 @@ function Footer() {
   return <footer className="footer">Powered by RightFix</footer>;
 }
 
+function getGroupIdFromPath() {
+  const m = window.location.pathname.match(/^\/group(\d+)\/?$/i);
+  if (!m) return null;
+  const id = Number(m[1]);
+  return groups.some(g => g.id === id) ? id : null;
+}
+
+function GroupsList({ session, onLogout }: { session: Session; onLogout: () => void }) {
+  return (
+    <div className="page">
+      <header className="hero">
+        <div className="hero-top">
+          <div>
+            <p className="kicker">CPE 411</p>
+            <h1>Microprocessor and Embedded Systems — Groupings</h1>
+            <p className="sub">Browse any group. You can edit only your own selection in your group.</p>
+          </div>
+          <div className="user-bar">
+            <span className="user-tag">{session.name} ({session.regNo})</span>
+            <button type="button" className="secondary" onClick={() => navigate(`/group${session.groupId}`)}>My group</button>
+            <button type="button" className="secondary" onClick={onLogout}>Logout</button>
+          </div>
+        </div>
+      </header>
+      <section className="card">
+        <h2>All groups</h2>
+        <div className="group-select-grid">
+          {groups.map(g => {
+            const topic = topics.find(t => t.id === g.id)!;
+            const mine = g.id === session.groupId;
+            return (
+              <button key={g.id} type="button" className={`group-card-btn ${mine ? "my-group" : ""}`} onClick={() => navigate(`/group${g.id}`)}>
+                <span className="group-num">Group {g.id} {mine && <span className="you">My group</span>}</span>
+                <span className="group-meta">{g.students.length} students · {topic.subtopics.length} subtopics</span>
+                <span className="group-topic">{topic.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <Footer />
+    </div>
+  );
+}
+
 function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
   const [regNo, setRegNo] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +154,8 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
 
   const isMyGroup = session.groupId === groupId;
   const canEdit = (sn: number) => isMyGroup && sn === session.studentSn;
+  const subtopicLabel = (idx: number | null) => idx == null ? "Not selected" : `Subtopic ${idx + 1}: ${topic.subtopics[idx]}`;
+  const roleLabel = (r: RoleId | null) => r ? (roles.find(x => x.id === r)?.label || r) : "Not selected";
 
   useEffect(() => {
     let alive = true;
@@ -180,7 +227,7 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
 
   return (
     <div className="page">
-      <header className="hero">
+      <header className="hero no-print">
         <div className="hero-top">
           <div>
             <p className="kicker">CPE 411 · {group.name}</p>
@@ -188,22 +235,30 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
           </div>
           <div className="user-bar">
             <span className="user-tag">{session.name} ({session.regNo})</span>
+            <button type="button" className="secondary" onClick={() => navigate("/")}>All groups</button>
+            {!isMyGroup && <button type="button" className="secondary" onClick={() => navigate(`/group${session.groupId}`)}>My group</button>}
+            <button type="button" className="secondary" onClick={() => window.print()}>Print group list</button>
             <button type="button" className="secondary" onClick={onLogout}>Logout</button>
           </div>
         </div>
         <p className="sub">
-          {isMyGroup ? "You can edit only your own subtopic and role." : "Viewing this group. You can only edit selections in your own group."}
+          {isMyGroup ? "You can edit only your own subtopic and role." : `Viewing ${group.name} (read-only). You can edit only in your own group.`}
           {" "}· {group.students.length} students · {topic.subtopics.length} subtopics · {filled} with subtopic selected
         </p>
       </header>
 
-      <section className="card">
-        <div className="section-head">
+      <section className="card print-sheet">
+        <div className="print-header">
+          <p className="kicker">CPE 411</p>
+          <h2>{group.name} — Group List</h2>
+          <p className="sub">{topic.title}</p>
+        </div>
+        <div className="section-head no-print">
           <h2>{group.name} — Student Selections</h2>
         </div>
-        {status && <p className="notice">{status}</p>}
+        {status && <p className="notice no-print">{status}</p>}
         <div className="table-wrap">
-          <table>
+          <table className="print-table">
             <thead>
               <tr><th>S/N</th><th>Student Name</th><th>Reg No</th><th>Subtopic</th><th>Role</th></tr>
             </thead>
@@ -213,47 +268,53 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
                 return (
                   <tr key={r.sn} id={`row-${r.sn}`} className={mine ? "mine" : ""}>
                     <td data-label="S/N">{r.sn}</td>
-                    <td data-label="Student Name" className="name">{r.name} {mine && <span className="you">You</span>}</td>
+                    <td data-label="Student Name" className="name">{r.name} {mine && <span className="you no-print">You</span>}</td>
                     <td data-label="Reg No" className="mono">{r.regNo}</td>
                     <td data-label="Subtopic" className="subtopic-cell">
-                      {mine ? (
-                        <>
-                          <button type="button" className="cell-btn" onClick={() => { setOpenSub(openSub === r.sn ? null : r.sn); setOpenRole(null); }}>
-                            {r.subtopicIndex == null ? <span className="muted">Not selected</span> : <span>Subtopic {r.subtopicIndex + 1}</span>}
-                          </button>
-                          {openSub === r.sn && (
-                            <div className="subtopic-menu">
-                              {topic.subtopics.map((s, i) => (
-                                <button key={i} type="button" className={`subtopic-option ${r.subtopicIndex === i ? "active" : ""}`} onClick={() => setSub(r.sn, i)}>
-                                  <strong>{i + 1}.</strong> {s}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="readonly-val">{r.subtopicIndex == null ? <span className="muted">Not selected</span> : <span>Subtopic {r.subtopicIndex + 1}</span>}</span>
-                      )}
+                      <span className="print-only">{subtopicLabel(r.subtopicIndex)}</span>
+                      <span className="screen-only">
+                        {mine ? (
+                          <>
+                            <button type="button" className="cell-btn" onClick={() => { setOpenSub(openSub === r.sn ? null : r.sn); setOpenRole(null); }}>
+                              {r.subtopicIndex == null ? <span className="muted">Not selected</span> : <span>Subtopic {r.subtopicIndex + 1}</span>}
+                            </button>
+                            {openSub === r.sn && (
+                              <div className="subtopic-menu">
+                                {topic.subtopics.map((s, i) => (
+                                  <button key={i} type="button" className={`subtopic-option ${r.subtopicIndex === i ? "active" : ""}`} onClick={() => setSub(r.sn, i)}>
+                                    <strong>{i + 1}.</strong> {s}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="readonly-val">{r.subtopicIndex == null ? <span className="muted">Not selected</span> : <span>Subtopic {r.subtopicIndex + 1}</span>}</span>
+                        )}
+                      </span>
                     </td>
                     <td data-label="Role" className="subtopic-cell">
-                      {mine ? (
-                        <>
-                          <button type="button" className="cell-btn" onClick={() => { setOpenRole(openRole === r.sn ? null : r.sn); setOpenSub(null); }}>
-                            {r.roleId ? <span className={`badge ${r.roleId}`}>{roles.find(x => x.id === r.roleId)?.label}</span> : <span className="muted">Not selected</span>}
-                          </button>
-                          {openRole === r.sn && (
-                            <div className="subtopic-menu">
-                              {roles.map(role => (
-                                <button key={role.id} type="button" className={`subtopic-option ${r.roleId === role.id ? "active" : ""}`} onClick={() => setRole(r.sn, role.id)}>
-                                  {role.label}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <span className="readonly-val">{r.roleId ? <span className={`badge ${r.roleId}`}>{roles.find(x => x.id === r.roleId)?.label}</span> : <span className="muted">Not selected</span>}</span>
-                      )}
+                      <span className="print-only">{roleLabel(r.roleId)}</span>
+                      <span className="screen-only">
+                        {mine ? (
+                          <>
+                            <button type="button" className="cell-btn" onClick={() => { setOpenRole(openRole === r.sn ? null : r.sn); setOpenSub(null); }}>
+                              {r.roleId ? <span className={`badge ${r.roleId}`}>{roles.find(x => x.id === r.roleId)?.label}</span> : <span className="muted">Not selected</span>}
+                            </button>
+                            {openRole === r.sn && (
+                              <div className="subtopic-menu">
+                                {roles.map(role => (
+                                  <button key={role.id} type="button" className={`subtopic-option ${r.roleId === role.id ? "active" : ""}`} onClick={() => setRole(r.sn, role.id)}>
+                                    {role.label}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <span className="readonly-val">{r.roleId ? <span className={`badge ${r.roleId}`}>{roles.find(x => x.id === r.roleId)?.label}</span> : <span className="muted">Not selected</span>}</span>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 );
@@ -263,7 +324,7 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
         </div>
       </section>
 
-      <section className="overview">
+      <section className="overview no-print">
         <div className="card summary-card">
           <h2>Group Overview</h2>
           <p className="summary-line">
@@ -306,6 +367,13 @@ function GroupPage({ groupId, session, onLogout }: { groupId: number; session: S
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(() => readSession());
+  const [path, setPath] = useState(() => window.location.pathname);
+
+  useEffect(() => {
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const onLogin = (s: Session) => {
     setSession(s);
@@ -319,15 +387,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (!session) {
-      if (window.location.pathname !== "/") navigate("/");
-      return;
+    if (!session && window.location.pathname !== "/") {
+      navigate("/");
     }
-    const target = `/group${session.groupId}`;
-    if (window.location.pathname !== target) navigate(target);
-  }, [session]);
+  }, [session, path]);
 
   if (!session) return <LoginPage onLogin={onLogin} />;
 
-  return <GroupPage groupId={session.groupId} session={session} onLogout={onLogout} />;
+  const groupId = getGroupIdFromPath();
+  if (groupId) return <GroupPage groupId={groupId} session={session} onLogout={onLogout} />;
+  return <GroupsList session={session} onLogout={onLogout} />;
 }
