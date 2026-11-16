@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { groups } from "../../../src/data/groups";
-import { topics } from "../../../src/data/topics";
+import groups from "../../../src/data/groups.json";
+import topics from "../../../src/data/topics.json";
 import { ensureSchema, withClient } from "../../_db";
 
 const roleIds = new Set(["presenter", "research", "slides"]);

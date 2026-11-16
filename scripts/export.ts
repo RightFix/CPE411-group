@@ -1,8 +1,11 @@
 import "dotenv/config";
 import fs from "node:fs";
+import { createRequire } from "module";
 import { ensureSchema, withClient } from "../server/db.js";
-import { groups } from "../src/data/groups.js";
-import { topics } from "../src/data/topics.js";
+
+const require = createRequire(import.meta.url);
+const groups = require("../src/data/groups.json") as { id: number; name: string; students: { sn: number; name: string; regNo: string }[] }[];
+const topics = require("../src/data/topics.json") as { id: number; title: string; subtopics: string[] }[];
 
 function esc(v: string) {
   const s = String(v ?? "");

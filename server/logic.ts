@@ -1,6 +1,9 @@
-import { groups } from "../src/data/groups.js";
-import { topics } from "../src/data/topics.js";
+import { createRequire } from "module";
 import { withClient } from "./db.js";
+
+const require = createRequire(import.meta.url);
+const groups = require("../src/data/groups.json") as { id: number; name: string; students: { sn: number; name: string; regNo: string }[] }[];
+const topics = require("../src/data/topics.json") as { id: number; title: string; subtopics: string[] }[];
 
 const roleIds = new Set(["presenter", "research", "slides"]);
 
