@@ -1,32 +1,36 @@
 import "dotenv/config";
 import fs from "node:fs";
-import { ensureSchema } from "../server/db.js";
-import { getState } from "../server/logic.js";
+import { ensureSchema, withClient } from "../server/db.js";
+import { groups } from "../src/data/groups.js";
+import { topics } from "../src/data/topics.js";
 
 function esc(v: string) {
   const s = String(v ?? "");
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+const roleLabel: Record<string, string> = { presenter: "Presenter", research: "Researcher", slides: "Slide Creator" };
+
 async function main() {
   await ensureSchema();
-  const state = await getState();
-  const subById = new Map(state.groups.map((g: any) => [g.id, g]));
-  const roleLabel: Record<string, string> = { presenter: "Presenter", research: "Researcher", slides: "Slide Creator" };
-  const lines = ["#,Name,Reg No,Subtopic,Role"];
-  for (const r of state.rows) {
-    const sub = r.subtopicId ? subById.get(r.subtopicId) : null;
-    lines.push([
-      r.index,
-      esc(r.name),
-      esc(r.regNo),
-      esc(sub ? `${sub.letter}. ${sub.short}` : ""),
-      esc(r.roleId ? (roleLabel[r.roleId] || r.roleId) : "Not selected"),
-    ].join(","));
+  const rows = await withClient(async (c) => (await c.query("SELECT group_id, student_sn, subtopic_index, role_id FROM group_selections")).rows);
+  const sel = new Map<string, any>();
+  for (const r of rows) sel.set(`${r.group_id}:${r.student_sn}`, r);
+
+  const lines = ["Group,S/N,Name,Reg No,Subtopic,Role"];
+  for (const g of groups) {
+    const topic = topics.find(t => t.id === g.id)!;
+    for (const s of g.students) {
+      const r = sel.get(`${g.id}:${s.sn}`);
+      const idx = r?.subtopic_index != null ? Number(r.subtopic_index) : null;
+      const sub = idx != null && topic.subtopics[idx] ? `${idx + 1}. ${topic.subtopics[idx]}` : "";
+      const role = r?.role_id ? (roleLabel[r.role_id] || r.role_id) : "Not selected";
+      lines.push([`Group ${g.id}`, s.sn, esc(s.name), esc(s.regNo), esc(sub), esc(role)].join(","));
+    }
   }
   const out = "selections-export.csv";
   fs.writeFileSync(out, lines.join("\n") + "\n", "utf8");
-  console.log(`Exported ${state.rows.length} rows to ${out}`);
+  console.log(`Exported ${lines.length - 1} rows to ${out}`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

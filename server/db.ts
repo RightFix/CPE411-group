@@ -5,8 +5,8 @@ let pool: pg.Pool | null = null;
 
 export function getPool() {
   if (!pool) {
-    const connectionString = process.env.DATABASE_URL;
-    if (!connectionString) throw new Error("DATABASE_URL is not set");
+    const connectionString = process.env.DB_URI;
+    if (!connectionString) throw new Error("DB_URI is not set");
     const needsSsl = !/sslmode=disable/i.test(connectionString) && !/localhost|127\.0\.0\.1/.test(connectionString);
     pool = new Pool({
       connectionString,
@@ -29,13 +29,15 @@ export async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): 
 export async function ensureSchema() {
   await withClient(async (c) => {
     await c.query(`
-      CREATE TABLE IF NOT EXISTS selections (
-        student_id INTEGER PRIMARY KEY,
-        subtopic_id TEXT NOT NULL,
-        role_id TEXT NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      CREATE TABLE IF NOT EXISTS group_selections (
+        group_id INTEGER NOT NULL,
+        student_sn INTEGER NOT NULL,
+        subtopic_index INTEGER,
+        role_id TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (group_id, student_sn)
       );
-      CREATE INDEX IF NOT EXISTS idx_sel_topic_role ON selections(subtopic_id, role_id);
+      CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
     `);
   });
 }

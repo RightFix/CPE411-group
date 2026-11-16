@@ -8,9 +8,9 @@ async function main() {
   }
   await ensureSchema();
   await withClient(async (c) => {
-    await c.query("TRUNCATE selections");
+    await c.query("TRUNCATE group_selections");
   });
-  console.log("All selections cleared.");
+  console.log("All group selections cleared.");
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

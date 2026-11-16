@@ -4,35 +4,35 @@ import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ensureSchema } from "./db.js";
-import { getState, pickSeat, releaseSeat } from "./logic.js";
+import { getGroupSelections, setGroupSelection } from "./logic.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get("/api/selection", async (_req, res) => {
+app.get("/api/groups/:id/selections", async (req, res) => {
   try {
-    const state = await getState();
-    res.json(state);
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const selections = await getGroupSelections(groupId);
+    if (!selections) return res.status(404).json({ error: "Group not found." });
+    res.json({ selections });
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Server error" });
   }
 });
 
-app.post("/api/selection", async (req, res) => {
+app.post("/api/groups/:id/selections", async (req, res) => {
   try {
-    const { name, regNo, subtopicId, roleId } = req.body || {};
-    const out = await pickSeat(name, regNo, subtopicId, roleId);
-    res.status(out.status).json(out.body);
-  } catch (e: any) {
-    res.status(500).json({ error: e?.message || "Server error" });
-  }
-});
-
-app.delete("/api/selection", async (req, res) => {
-  try {
-    const { name, regNo } = { ...(req.body || {}), ...(req.query || {}) } as any;
-    const out = await releaseSeat(name, regNo);
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const { studentSn, subtopicIndex, roleId } = req.body || {};
+    const out = await setGroupSelection(
+      groupId,
+      Number(studentSn),
+      subtopicIndex === null || subtopicIndex === undefined ? null : Number(subtopicIndex),
+      roleId ?? null
+    );
     res.status(out.status).json(out.body);
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Server error" });

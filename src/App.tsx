@@ -12,6 +12,13 @@ const roles: { id: RoleId; label: string }[] = [
 
 type Row = Student & { subtopicIndex: number | null; roleId: RoleId | null };
 
+async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as any).error || "Request failed");
+  return data as T;
+}
+
 function getGroupIdFromPath() {
   const m = window.location.pathname.match(/^\/group(\d+)\/?$/i);
   if (!m) return null;
@@ -58,14 +65,54 @@ function GroupPage({ groupId }: { groupId: number }) {
   const [rows, setRows] = useState<Row[]>(() => group.students.map(s => ({ ...s, subtopicIndex: null, roleId: null })));
   const [openSub, setOpenSub] = useState<number | null>(null);
   const [openRole, setOpenRole] = useState<number | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setRows(group.students.map(s => ({ ...s, subtopicIndex: null, roleId: null })));
+    let alive = true;
+    setStatus("Loading selections…");
+    api<{ selections: { sn: number; subtopicIndex: number | null; roleId: RoleId | null }[] }>(`/api/groups/${groupId}/selections`)
+      .then(data => {
+        if (!alive) return;
+        const bySn = new Map(data.selections.map(s => [s.sn, s]));
+        setRows(group.students.map(s => ({
+          ...s,
+          subtopicIndex: bySn.get(s.sn)?.subtopicIndex ?? null,
+          roleId: (bySn.get(s.sn)?.roleId as RoleId | null) ?? null,
+        })));
+        setStatus(null);
+      })
+      .catch(e => { if (alive) setStatus(e.message || "Failed to load selections"); });
     setOpenSub(null); setOpenRole(null);
+    return () => { alive = false; };
   }, [groupId]);
 
-  const setSub = (sn: number, idx: number) => { setRows(rs => rs.map(r => r.sn === sn ? { ...r, subtopicIndex: idx } : r)); setOpenSub(null); };
-  const setRole = (sn: number, roleId: RoleId) => { setRows(rs => rs.map(r => r.sn === sn ? { ...r, roleId } : r)); setOpenRole(null); };
+  const persist = async (sn: number, subtopicIndex: number | null, roleId: RoleId | null) => {
+    try {
+      await api(`/api/groups/${groupId}/selections`, { method: "POST", body: JSON.stringify({ studentSn: sn, subtopicIndex, roleId }) });
+      setStatus(null);
+    } catch (e: any) {
+      setStatus(e.message || "Failed to save");
+    }
+  };
+
+  const setSub = (sn: number, idx: number) => {
+    const prev = rows;
+    const next = rows.map(r => r.sn === sn ? { ...r, subtopicIndex: idx } : r);
+    setRows(next);
+    setOpenSub(null);
+    const row = next.find(r => r.sn === sn)!;
+    persist(sn, row.subtopicIndex, row.roleId);
+    void prev;
+  };
+  const setRole = (sn: number, roleId: RoleId) => {
+    const prev = rows;
+    const next = rows.map(r => r.sn === sn ? { ...r, roleId } : r);
+    setRows(next);
+    setOpenRole(null);
+    const row = next.find(r => r.sn === sn)!;
+    persist(sn, row.subtopicIndex, row.roleId);
+    void prev;
+  };
 
   const overview = useMemo(() => {
     return topic.subtopics.map((st, i) => {
@@ -94,6 +141,7 @@ function GroupPage({ groupId }: { groupId: number }) {
         <div className="section-head">
           <h2>{group.name} — Student Selections</h2>
         </div>
+        {status && <p className="notice">{status}</p>}
         <div className="table-wrap">
           <table>
             <thead>
