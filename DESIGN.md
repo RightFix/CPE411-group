@@ -113,10 +113,10 @@ components:
     backgroundColor: "{colors.paper}"
     rounded: "{rounded.md}"
     padding: "{spacing.lg}"
-    shadow: "{shadows.card}"
+    shadow: "{shadows.none}"
     border: "1px solid {colors.hairline}"
   card-hover:
-    shadow: "{shadows.modal}"
+    shadow: "{shadows.none}"
     transform: "translateY(-2px)"
   navigation:
     backgroundColor: "{colors.paper}"
@@ -138,7 +138,7 @@ components:
     color: "{colors.ink}"
     rounded: "{rounded.sm}"
     padding: "12px 16px"
-    shadow: "{shadows.soft-lift}"
+    shadow: "{shadows.none}"
     border: "1px solid {colors.hairline}"
     typography: "{typography.body-md}"
     cursor: "pointer"
