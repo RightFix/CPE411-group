@@ -3,8 +3,14 @@ import express from "express";
 import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ensureSchema } from "./db.js";
+import { ensureSchema, withClient } from "./db.js";
 import { getGroupSelections, setGroupSelection } from "./logic.js";
+import {
+  createGroupMaterial,
+  deleteGroupMaterial,
+  listGroupMaterials,
+  requestMaterialUploadUrl,
+} from "./materials.js";
 
 const app = express();
 app.use(cors());
@@ -34,6 +40,52 @@ app.post("/api/groups/:id/selections", async (req, res) => {
       roleId ?? null,
       regNo
     );
+    res.status(out.status).json(out.body);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+app.get("/api/groups/:id/materials", async (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const data = await listGroupMaterials(withClient, groupId);
+    if (!data) return res.status(404).json({ error: "Group not found." });
+    res.json(data);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+app.post("/api/groups/:id/materials/upload-url", async (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const out = await requestMaterialUploadUrl(groupId, req.body || {});
+    res.status(out.status).json(out.body);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+app.post("/api/groups/:id/materials", async (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const out = await createGroupMaterial(withClient, groupId, req.body || {});
+    res.status(out.status).json(out.body);
+  } catch (e: any) {
+    res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+app.delete("/api/groups/:id/materials/:materialId", async (req, res) => {
+  try {
+    const groupId = Number(req.params.id);
+    if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
+    const regNo = req.body?.regNo ?? req.query?.regNo;
+    const out = await deleteGroupMaterial(withClient, groupId, String(req.params.materialId || ""), regNo);
     res.status(out.status).json(out.body);
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Server error" });

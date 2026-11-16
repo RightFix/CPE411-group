@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { MaterialsTab } from "./components/MaterialsTab";
 import { Badge, type BadgeTone } from "./components/ui/Badge";
 import { Button } from "./components/ui/Button";
 import { Card } from "./components/ui/Card";
 import {
-  ArrowLeftIcon,
+  AlertCircleIcon,
   BookOpenIcon,
+  ChevronDownIcon,
+  ChipLogoIcon,
+  FolderIcon,
+  GitHubIcon,
   PrinterIcon,
   SearchIcon,
   UsersIcon,
 } from "./components/ui/Icons";
+import type { MaterialItem } from "./types/materials";
 import { Input } from "./components/ui/Input";
 import { Navbar } from "./components/ui/Navbar";
 import { Select, type SelectOption } from "./components/ui/Select";
@@ -36,7 +42,7 @@ const roles: { id: RoleId; label: string; tone: BadgeTone; description: string }
 type Row = Student & { subtopicIndex: number | null; roleId: RoleId | null };
 type Session = { regNo: string; studentSn: number; groupId: number; name: string };
 type SaveState = { kind: "idle" | "saving" | "saved" | "error"; text: string };
-type GroupTab = "roster" | "subtopics";
+type GroupTab = "roster" | "subtopics" | "materials";
 type RosterFilter = "all" | "selected" | "pending";
 
 const SESSION_KEY = "cpe411_regno";
@@ -88,8 +94,14 @@ function navigate(to: string) {
 function Footer() {
   return (
     <footer className="footer no-print">
-      <a href="https://github.com/RightFix/CPE411-group" target="_blank" rel="noopener noreferrer">
-        Powered by RightFix
+      <a
+        href="https://github.com/RightFix/CPE411-group"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="footer-link"
+      >
+        <GitHubIcon size={16} />
+        <span>Powered by RightFix</span>
       </a>
     </footer>
   );
@@ -104,6 +116,42 @@ function getGroupIdFromPath() {
 
 function getRoleMeta(roleId: RoleId | null) {
   return roleId ? roles.find((r) => r.id === roleId) ?? null : null;
+}
+
+function ProgressRing({ percent }: { percent: number }) {
+  const radius = 21;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const offset = circumference - (clamped / 100) * circumference;
+
+  return (
+    <div className="stat-ring" aria-label={`${clamped}%`}>
+      <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+        <circle
+          cx="26"
+          cy="26"
+          r={radius}
+          fill="none"
+          stroke="var(--color-hairline-strong)"
+          strokeWidth="4.5"
+        />
+        <circle
+          cx="26"
+          cy="26"
+          r={radius}
+          fill="none"
+          stroke="var(--color-primary)"
+          strokeWidth="4.5"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform="rotate(-90 26 26)"
+          style={{ transition: "stroke-dashoffset 300ms var(--ease-out)" }}
+        />
+      </svg>
+      <span className="stat-ring-text mono">{clamped}%</span>
+    </div>
+  );
 }
 
 /* ==========================================================================
@@ -130,44 +178,46 @@ function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
   };
 
   return (
-    <div className="page page--narrow">
-      <main className="login-shell">
-        <header className="page-header">
-          <div className="login-brand">
-            <span className="ui-navbar-dot" aria-hidden="true" />
-            <span>CPE 411 · Microprocessor &amp; Embedded Systems</span>
-          </div>
-          <h1 className="login-title">Sign in to your group</h1>
-          <p className="page-subtitle">
-            Enter your registration number to view your assigned group and select your subtopic and role.
-          </p>
-        </header>
+    <>
+      <div className="page page--narrow">
+        <main className="login-shell">
+          <header className="page-header">
+            <div className="login-brand">
+              <ChipLogoIcon size={24} />
+              <span>CPE 411 · Microprocessor &amp; Embedded Systems</span>
+            </div>
+            <h1 className="login-title">Sign in to your group</h1>
+            <p className="page-subtitle">
+              Enter your registration number to view your assigned group and select your subtopic and role.
+            </p>
+          </header>
 
-        <Card padding="lg">
-          <form onSubmit={submit} className="login-form">
-            <Input
-              label="Registration Number"
-              value={regNo}
-              onChange={(e) => {
-                setRegNo(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder="e.g. 22/EG/CO/1631"
-              autoComplete="off"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              enterKeyHint="go"
-              error={error ?? undefined}
-              required
-            />
-            <Button type="submit" variant="primary" size="lg" fullWidth>
-              Continue to my group
-            </Button>
-          </form>
-        </Card>
-      </main>
+          <Card padding="lg">
+            <form onSubmit={submit} className="login-form">
+              <Input
+                label="Registration Number"
+                value={regNo}
+                onChange={(e) => {
+                  setRegNo(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="e.g. 22/EG/CO/1631"
+                autoComplete="off"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                enterKeyHint="go"
+                error={error ?? undefined}
+                required
+              />
+              <Button type="submit" variant="primary" size="lg" fullWidth>
+                Continue to my group
+              </Button>
+            </form>
+          </Card>
+        </main>
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }
 
@@ -177,64 +227,81 @@ function LoginPage({ onLogin }: { onLogin: (session: Session) => void }) {
 
 function GroupsList({ session, onLogout }: { session: Session; onLogout: () => void }) {
   return (
-    <div className="page">
-      <Navbar
-        brandLabel="CPE 411"
-        studentName={session.name}
-        studentRegNo={session.regNo}
-        actions={
-          <Button variant="secondary" size="sm" onClick={() => navigate(`/group${session.groupId}`)}>
-            My group
-          </Button>
-        }
-        onLogout={onLogout}
-      />
+    <>
+      <div className="page">
+        <Navbar
+          brandLabel="CPE 411"
+          studentName={session.name}
+          studentRegNo={session.regNo}
+          actions={
+            <Button variant="secondary" size="sm" onClick={() => navigate(`/group${session.groupId}`)}>
+              My group
+            </Button>
+          }
+          onLogout={onLogout}
+        />
 
-      <main className="page-main">
-        <header className="page-header">
-          <h1 className="page-title">Course Groupings</h1>
-          <p className="page-subtitle">
-            Browse all {groups.length} project groups. You can edit your own subtopic and role inside Group{" "}
-            {session.groupId}.
-          </p>
-        </header>
+        <main className="page-main">
+          <header className="page-header">
+            <h1 className="page-title">Course Groupings</h1>
+            <p className="page-subtitle">
+              Browse all {groups.length} project groups. You can edit your own subtopic and role inside Group{" "}
+              {session.groupId}.
+            </p>
+          </header>
 
-        <div className="groups-grid">
-          {groups.map((g) => {
-            const topic = topics.find((t) => t.id === g.id)!;
-            const mine = g.id === session.groupId;
-            return (
-              <button
-                key={g.id}
-                type="button"
-                className={`folder-card ${mine ? "is-mine" : ""}`}
-                onClick={() => navigate(`/group${g.id}`)}
-              >
-                <span className="folder-tab" aria-hidden="true">
-                  <span className="folder-tab-label">{g.name}</span>
-                  {mine && <span className="folder-tab-dot" />}
-                </span>
-                <span className="folder-back" aria-hidden="true" />
-                <span className="folder-sheet folder-sheet--back" aria-hidden="true" />
-                <span className="folder-sheet folder-sheet--front" aria-hidden="true" />
-                <span className="folder-body">
-                  <span className="folder-body-head">
-                    <span className="folder-num">{g.name}</span>
-                    {mine && <Badge tone="primary">My group</Badge>}
+          <div className="groups-grid">
+            {groups.map((g) => {
+              const topic = topics.find((t) => t.id === g.id)!;
+              const mine = g.id === session.groupId;
+              return (
+                <button
+                  key={g.id}
+                  type="button"
+                  className={`folder-card ${mine ? "is-mine" : ""}`}
+                  onClick={() => navigate(`/group${g.id}`)}
+                >
+                  <span className="folder-pocket" aria-hidden="true">
+                    <span className="folder-doc-back" />
+                    <span className="folder-doc">
+                      <span className="folder-doc-kicker">Course content</span>
+                      {topic.subtopics.slice(0, 3).map((sub, idx) => (
+                        <span key={idx} className="folder-doc-line">
+                          <span className="folder-doc-idx mono">{idx + 1}</span>
+                          <span className="folder-doc-text">{sub}</span>
+                        </span>
+                      ))}
+                    </span>
                   </span>
-                  <span className="folder-topic">{topic.title}</span>
-                  <span className="folder-meta tabular">
-                    {g.students.length} students · {topic.subtopics.length} subtopics
-                  </span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </main>
 
+                  <span className="folder-flap">
+                    <svg
+                      className="folder-flap-curve"
+                      viewBox="0 0 320 28"
+                      preserveAspectRatio="none"
+                      aria-hidden="true"
+                    >
+                      <path d="M0,16 C0,6 8,0 20,0 L118,0 C138,0 146,16 170,16 L304,16 C314,16 320,21 320,28 L0,28 Z" />
+                    </svg>
+                    <span className="folder-flap-content">
+                      <span className="folder-body-head">
+                        <span className="folder-num">{g.name}</span>
+                        {mine && <Badge tone="primary">My group</Badge>}
+                      </span>
+                      <span className="folder-topic">{topic.title}</span>
+                      <span className="folder-meta tabular">
+                        {g.students.length} students · {topic.subtopics.length} subtopics
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </main>
+      </div>
       <Footer />
-    </div>
+    </>
   );
 }
 
@@ -259,11 +326,20 @@ function GroupPage({
   );
   const [draftSubtopic, setDraftSubtopic] = useState<number | null>(null);
   const [draftRole, setDraftRole] = useState<RoleId | null>(null);
-  const [saveState, setSaveState] = useState<SaveState>({ kind: "saving", text: "Loading selections…" });
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle", text: "" });
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [activeTab, setActiveTab] = useState<GroupTab>("roster");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<RosterFilter>("all");
+  const [formOpen, setFormOpen] = useState(true);
+  const [isEditingSelection, setIsEditingSelection] = useState(false);
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [storageConfigured, setStorageConfigured] = useState(true);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
+  const [materialsReloadKey, setMaterialsReloadKey] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -327,21 +403,63 @@ function GroupPage({
         setRows(loadedRows);
         if (isMyGroup) {
           const mine = loadedRows.find((r) => r.sn === session.studentSn);
-          setDraftSubtopic(mine?.subtopicIndex ?? null);
-          setDraftRole(mine?.roleId ?? null);
+          const sub = mine?.subtopicIndex ?? null;
+          const role = mine?.roleId ?? null;
+          setDraftSubtopic(sub);
+          setDraftRole(role);
+          setIsEditingSelection(sub == null || role == null);
         }
+        setLoadError(null);
+        setIsLoading(false);
         setSaveState({ kind: "idle", text: "" });
       })
       .catch((e: Error) => {
         if (!alive) return;
-        setLoadError(e.message || "Failed to load selections");
-        setSaveState({ kind: "error", text: "Could not load selections" });
+        setLoadError(e.message || "Unable to reach the server. Check your connection and try again.");
+        setIsLoading(false);
+        setSaveState({ kind: "error", text: "Load failed" });
       });
 
     return () => {
       alive = false;
     };
-  }, [groupId, group.students, isMyGroup, session.studentSn]);
+  }, [groupId, group.students, isMyGroup, session.studentSn, reloadKey]);
+
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setSaveState({ kind: "idle", text: "" });
+    setReloadKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    let alive = true;
+    api<{ materials: MaterialItem[]; storageConfigured?: boolean }>(
+      `/api/groups/${groupId}/materials`
+    )
+      .then((data) => {
+        if (!alive) return;
+        setMaterials(data.materials || []);
+        setStorageConfigured(data.storageConfigured !== false);
+        setMaterialsError(null);
+        setMaterialsLoading(false);
+      })
+      .catch((e: Error) => {
+        if (!alive) return;
+        setMaterialsError(e.message || "Unable to load materials.");
+        setMaterialsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [groupId, materialsReloadKey]);
+
+  const retryMaterials = () => {
+    setMaterialsLoading(true);
+    setMaterialsError(null);
+    setMaterialsReloadKey((k) => k + 1);
+  };
 
   const myRow = useMemo(
     () => (isMyGroup ? rows.find((r) => r.sn === session.studentSn) ?? null : null),
@@ -379,10 +497,11 @@ function GroupPage({
         )
       );
       setSaveState({ kind: "saved", text: "Saved" });
+      setIsEditingSelection(false);
       const roleMeta = getRoleMeta(draftRole);
       showToast(
         "success",
-        "Selection submitted",
+        "Selection saved",
         `Subtopic ${draftSubtopic + 1}${roleMeta ? ` · ${roleMeta.label}` : ""}`
       );
       window.setTimeout(() => {
@@ -390,8 +509,8 @@ function GroupPage({
       }, 2000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save";
-      setSaveState({ kind: "error", text: `Not saved: ${msg}` });
-      showToast("error", "Could not submit selection", msg);
+      setSaveState({ kind: "error", text: "Save failed" });
+      showToast("error", "Could not save selection", msg);
     }
   };
 
@@ -423,116 +542,269 @@ function GroupPage({
   const subtopicPrintLabel = (idx: number | null) =>
     idx == null ? "Not selected" : `Subtopic ${idx + 1}: ${topic.subtopics[idx]}`;
 
+  const subtopicPct = group.students.length
+    ? Math.round((filledSubtopics / group.students.length) * 100)
+    : 0;
+  const rolePct = group.students.length
+    ? Math.round((filledRoles / group.students.length) * 100)
+    : 0;
+  const hasSavedSelection =
+    myRow != null && myRow.subtopicIndex != null && myRow.roleId != null;
+  const savedRoleMeta = getRoleMeta(myRow?.roleId ?? null);
+
   return (
-    <div className="page">
+    <>
+      <div className="page page--has-bottom-bar">
       <Navbar
         brandLabel="CPE 411"
         onBrandClick={() => navigate("/")}
         studentName={session.name}
         studentRegNo={session.regNo}
-        actions={
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
-            <ArrowLeftIcon size={15} />
-            <span>All groups</span>
-          </Button>
-        }
         onLogout={onLogout}
       />
 
       <main className="page-main">
-        {/* Topic Header */}
+        {/* Topic Header (Option 3 layout + Option 2 Group pill + Border-in-border ring stat cards) */}
         <header className="page-header no-print">
-          <div className="page-header-row">
-            <div>
+          <nav className="group-breadcrumb" aria-label="Breadcrumb">
+            <button type="button" className="group-breadcrumb-link" onClick={() => navigate("/")}>
+              All groups
+            </button>
+            <span className="group-breadcrumb-sep" aria-hidden="true">/</span>
+            <span className="group-pill">{group.name}</span>
+            <span className="group-breadcrumb-meta tabular">· {topic.subtopics.length} subtopics</span>
+          </nav>
+
+          <div className="group-hero-grid">
+            <div className="group-hero-main">
               <h1 className="page-title">{topic.title}</h1>
-              <div className="meta-strip tabular">
-                <span>
-                  <strong>{group.name}</strong>
-                </span>
-                <span className="meta-dot" aria-hidden="true" />
-                <span>{group.students.length} students</span>
-                <span className="meta-dot" aria-hidden="true" />
-                <span>{topic.subtopics.length} subtopics</span>
-                <span className="meta-dot" aria-hidden="true" />
-                <span>
-                  {filledSubtopics}/{group.students.length} subtopics · {filledRoles}/{group.students.length} roles
-                </span>
+              <div className="group-hero-actions">
+                <Button variant="secondary" size="sm" onClick={() => window.print()}>
+                  <PrinterIcon size={15} />
+                  <span>Print roster</span>
+                </Button>
               </div>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => window.print()}>
-              <PrinterIcon size={15} />
-              <span>Print group list</span>
-            </Button>
+
+            <div className="stat-pair">
+              <div className="stat-shell">
+                <div className="stat-shell-head">
+                  <span className="stat-shell-icon" aria-hidden="true">
+                    <BookOpenIcon size={13} />
+                  </span>
+                  <span className="stat-shell-label">Subtopics picked</span>
+                </div>
+                <div className="stat-inner">
+                  {isLoading ? (
+                    <div className="stat-skeleton" aria-busy="true" aria-label="Loading subtopic stats">
+                      <span className="skeleton-line skeleton-line--lg" />
+                      <span className="skeleton-line skeleton-line--sm" />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="stat-fraction mono">
+                          <strong>{filledSubtopics}</strong>
+                          <span> / {group.students.length}</span>
+                        </div>
+                        <div className="stat-caption">Students assigned</div>
+                      </div>
+                      <ProgressRing percent={subtopicPct} />
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="stat-shell">
+                <div className="stat-shell-head">
+                  <span className="stat-shell-icon" aria-hidden="true">
+                    <UsersIcon size={13} />
+                  </span>
+                  <span className="stat-shell-label">Roles filled</span>
+                </div>
+                <div className="stat-inner">
+                  {isLoading ? (
+                    <div className="stat-skeleton" aria-busy="true" aria-label="Loading role stats">
+                      <span className="skeleton-line skeleton-line--lg" />
+                      <span className="skeleton-line skeleton-line--sm" />
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <div className="stat-fraction mono">
+                          <strong>{filledRoles}</strong>
+                          <span> / {group.students.length}</span>
+                        </div>
+                        <div className="stat-caption">Roles assigned</div>
+                      </div>
+                      <ProgressRing percent={rolePct} />
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Pinned Action Form for Current Student (Mobile-First UX) */}
+        {/* Pinned Selection Summary or Collapsible Form for Current Student */}
         {isMyGroup && myRow && (
           <Card padding="lg" className="my-selection-card no-print">
-            <form onSubmit={handleSubmit}>
-              <div className="my-selection-head">
-                <div>
-                  <h2 className="my-selection-title">Your Selection</h2>
-                  <p className="my-selection-sub">
-                    {myRow.name} · <span className="mono">{myRow.regNo}</span>
-                  </p>
+            {isLoading ? (
+              <div className="form-skeleton" aria-busy="true" aria-label="Loading your selection">
+                <div className="my-selection-grid">
+                  <span className="skeleton-field" />
+                  <span className="skeleton-field" />
                 </div>
-                {saveState.kind !== "idle" ? (
-                  <span
-                    className={`status-pill ${
-                      saveState.kind === "saved"
-                        ? "is-saved"
-                        : saveState.kind === "error"
-                          ? "is-error"
-                          : ""
-                    }`}
-                    role="status"
-                    aria-live="polite"
+              </div>
+            ) : hasSavedSelection && !isEditingSelection ? (
+              <div className="my-selection-summary">
+                <div className="my-selection-toggle-top">
+                  <div>
+                    <h2 className="my-selection-title">Your Subtopic &amp; Role</h2>
+                    <div className="my-selection-sub">
+                      <span>{myRow.name}</span>
+                      <span className="mono my-selection-reg">{myRow.regNo}</span>
+                    </div>
+                  </div>
+                  <div className="my-selection-toggle-right">
+                    {saveState.kind === "saved" && (
+                      <span className="status-pill is-saved" role="status" aria-live="polite">
+                        {saveState.text}
+                      </span>
+                    )}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setDraftSubtopic(myRow.subtopicIndex);
+                        setDraftRole(myRow.roleId);
+                        setIsEditingSelection(true);
+                        setFormOpen(true);
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="my-selection-summary-grid">
+                  <div className="my-selection-summary-box">
+                    <span className="stat-shell-label">Subtopic {myRow.subtopicIndex! + 1}</span>
+                    <p className="my-selection-summary-text">
+                      {topic.subtopics[myRow.subtopicIndex!]}
+                    </p>
+                  </div>
+                  <div className="my-selection-summary-box">
+                    <span className="stat-shell-label">Role</span>
+                    <div style={{ marginTop: 6 }}>
+                      {savedRoleMeta && (
+                        <Badge tone={savedRoleMeta.tone}>{savedRoleMeta.label}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="my-selection-head" style={{ marginBottom: formOpen ? "var(--space-md)" : 0 }}>
+                  <button
+                    type="button"
+                    className="my-selection-toggle"
+                    aria-expanded={formOpen}
+                    onClick={() => setFormOpen((prev) => !prev)}
                   >
-                    {saveState.text}
-                  </span>
-                ) : (
-                  isDirty && <span className="status-pill">Unsaved changes</span>
-                )}
-              </div>
-
-              <div className="my-selection-grid">
-                <Select
-                  label="Subtopic"
-                  value={draftSubtopic}
-                  options={subtopicOptions}
-                  placeholder="Choose your subtopic"
-                  onChange={(val) => setDraftSubtopic(val)}
-                />
-                <Select
-                  label="Role"
-                  value={draftRole}
-                  options={roleOptions}
-                  placeholder="Choose your role"
-                  onChange={(val) => setDraftRole(val)}
-                />
-              </div>
-
-              {draftSubtopic != null && (
-                <div className="my-selection-preview">
-                  <strong>Subtopic {draftSubtopic + 1}:</strong>{" "}
-                  {topic.subtopics[draftSubtopic]}
+                    <span className="my-selection-toggle-top">
+                      <span className="my-selection-title">Your Subtopic &amp; Role</span>
+                      <span className="my-selection-toggle-right">
+                        {saveState.kind !== "idle" ? (
+                          <span
+                            className={`status-pill ${
+                              saveState.kind === "saved"
+                                ? "is-saved"
+                                : saveState.kind === "error"
+                                  ? "is-error"
+                                  : ""
+                            }`}
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {saveState.text}
+                          </span>
+                        ) : (
+                          isDirty && <span className="status-pill">Unsaved</span>
+                        )}
+                        <ChevronDownIcon
+                          size={18}
+                          className={`my-selection-chevron ${formOpen ? "is-open" : ""}`}
+                        />
+                      </span>
+                    </span>
+                    <span className="my-selection-sub">
+                      <span>{myRow.name}</span>
+                      <span className="mono my-selection-reg">{myRow.regNo}</span>
+                    </span>
+                  </button>
                 </div>
-              )}
 
-              <div className="my-selection-actions">
-                <span className="my-selection-hint">
-                  {draftSubtopic == null || draftRole == null
-                    ? "Select both a subtopic and a role to submit."
-                    : isDirty
-                      ? "Click Submit selection to save your choice."
-                      : "Your current selection is saved."}
-                </span>
-                <Button type="submit" variant="primary" disabled={!canSubmit}>
-                  {saveState.kind === "saving" ? "Submitting…" : "Submit selection"}
-                </Button>
-              </div>
-            </form>
+                {formOpen && (
+                  <form onSubmit={handleSubmit}>
+                    <div className="my-selection-grid">
+                      <Select
+                        label="Subtopic"
+                        value={draftSubtopic}
+                        options={subtopicOptions}
+                        placeholder="Select a subtopic"
+                        disabled={!!loadError}
+                        onChange={(val) => setDraftSubtopic(val)}
+                      />
+                      <Select
+                        label="Role"
+                        value={draftRole}
+                        options={roleOptions}
+                        placeholder="Select a role"
+                        disabled={!!loadError}
+                        onChange={(val) => setDraftRole(val)}
+                      />
+                    </div>
+
+                    {draftSubtopic != null && (
+                      <div className="my-selection-preview">
+                        <strong>Subtopic {draftSubtopic + 1}:</strong>{" "}
+                        {topic.subtopics[draftSubtopic]}
+                      </div>
+                    )}
+
+                    <div className="my-selection-actions">
+                      <span className="my-selection-hint">
+                        {draftSubtopic == null || draftRole == null
+                          ? "Pick both a subtopic and a role, then save."
+                          : isDirty
+                            ? "Ready to save your changes."
+                            : `Saved to ${group.name}.`}
+                      </span>
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {hasSavedSelection && (
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => {
+                              setDraftSubtopic(myRow.subtopicIndex);
+                              setDraftRole(myRow.roleId);
+                              setIsEditingSelection(false);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        <Button type="submit" variant="primary" disabled={!canSubmit}>
+                          {saveState.kind === "saving" ? "Saving…" : "Save selection"}
+                        </Button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+              </>
+            )}
           </Card>
         )}
 
@@ -540,24 +812,32 @@ function GroupPage({
         {!isMyGroup && (
           <Card variant="cloud" padding="sm" className="readonly-banner no-print">
             <p className="readonly-banner-text">
-              Viewing <strong>{group.name}</strong> in read-only mode. You can only edit selections in Group{" "}
-              {session.groupId}.
+              Read-only view for <strong>{group.name}</strong>. Switch to Group {session.groupId} to update your own selection.
             </p>
             <Button variant="secondary" size="sm" onClick={() => navigate(`/group${session.groupId}`)}>
-              Go to Group {session.groupId}
+              Open Group {session.groupId}
             </Button>
           </Card>
         )}
 
         {loadError && (
-          <Card variant="cloud" padding="sm" className="no-print">
-            <p className="ui-field-error" role="alert">
-              {loadError}
-            </p>
+          <Card padding="md" className="error-card no-print" role="alert">
+            <div className="error-card-body">
+              <span className="error-card-icon" aria-hidden="true">
+                <AlertCircleIcon size={18} />
+              </span>
+              <div>
+                <p className="error-card-title">Could not load group selections</p>
+                <p className="error-card-desc">{loadError}</p>
+              </div>
+            </div>
+            <Button variant="secondary" size="sm" onClick={retryLoad}>
+              Retry
+            </Button>
           </Card>
         )}
 
-        {/* View Switcher */}
+        {/* Desktop View Switcher */}
         <div className="toolbar no-print">
           <div className="segmented" role="tablist" aria-label="Group views">
             <button
@@ -567,7 +847,7 @@ function GroupPage({
               className={`segmented-btn ${activeTab === "roster" ? "is-active" : ""}`}
               onClick={() => setActiveTab("roster")}
             >
-              <UsersIcon size={15} />
+              <UsersIcon size={15} variant={activeTab === "roster" ? "Bold" : "Linear"} />
               <span>Student Roster</span>
             </button>
             <button
@@ -577,8 +857,18 @@ function GroupPage({
               className={`segmented-btn ${activeTab === "subtopics" ? "is-active" : ""}`}
               onClick={() => setActiveTab("subtopics")}
             >
-              <BookOpenIcon size={15} />
+              <BookOpenIcon size={15} variant={activeTab === "subtopics" ? "Bold" : "Linear"} />
               <span>Subtopic Breakdown</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "materials"}
+              className={`segmented-btn ${activeTab === "materials" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("materials")}
+            >
+              <FolderIcon size={15} variant={activeTab === "materials" ? "Bold" : "Linear"} />
+              <span>Materials ({materialsLoading ? "…" : materials.length})</span>
             </button>
           </div>
         </div>
@@ -598,7 +888,7 @@ function GroupPage({
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search student name or reg no…"
+                  placeholder="Search by name or reg no…"
                   leadingIcon={<SearchIcon size={15} />}
                   aria-label="Search students"
                 />
@@ -616,14 +906,14 @@ function GroupPage({
                   className={`filter-pill ${filter === "selected" ? "is-active" : ""}`}
                   onClick={() => setFilter("selected")}
                 >
-                  Selected ({filledSubtopics})
+                  Assigned ({filledSubtopics})
                 </button>
                 <button
                   type="button"
                   className={`filter-pill ${filter === "pending" ? "is-active" : ""}`}
                   onClick={() => setFilter("pending")}
                 >
-                  Pending ({rows.length - filledSubtopics})
+                  Unassigned ({rows.length - filledSubtopics})
                 </button>
               </div>
             </div>
@@ -661,20 +951,24 @@ function GroupPage({
                         <TableCell>
                           <span className="print-only">{subtopicPrintLabel(r.subtopicIndex)}</span>
                           <div className="no-print">
-                            {r.subtopicIndex != null ? (
+                            {isLoading ? (
+                              <span className="skeleton-line skeleton-line--md" />
+                            ) : r.subtopicIndex != null ? (
                               <span>Subtopic {r.subtopicIndex + 1}</span>
                             ) : (
-                              <span className="muted-text">Not selected</span>
+                              <span className="muted-text">Unassigned</span>
                             )}
                           </div>
                         </TableCell>
                         <TableCell>
                           <span className="print-only">{roleMeta?.label ?? "Not selected"}</span>
                           <div className="no-print">
-                            {roleMeta ? (
+                            {isLoading ? (
+                              <span className="skeleton-line skeleton-line--sm" />
+                            ) : roleMeta ? (
                               <Badge tone={roleMeta.tone}>{roleMeta.label}</Badge>
                             ) : (
-                              <span className="muted-text">Not selected</span>
+                              <span className="muted-text">Unassigned</span>
                             )}
                           </div>
                         </TableCell>
@@ -686,7 +980,9 @@ function GroupPage({
 
               {filteredRows.length === 0 && (
                 <div className="empty-state no-print">
-                  No students match “{search}”.
+                  {search.trim()
+                    ? `No students match “${search}”. Try a different name or registration number.`
+                    : `No ${filter === "selected" ? "assigned" : "unassigned"} students in this group yet.`}
                 </div>
               )}
             </div>
@@ -713,20 +1009,24 @@ function GroupPage({
                       <div className="student-card-row">
                         <span className="student-card-key">Subtopic</span>
                         <span className="student-card-val">
-                          {r.subtopicIndex != null ? (
+                          {isLoading ? (
+                            <span className="skeleton-line skeleton-line--sm" />
+                          ) : r.subtopicIndex != null ? (
                             `Subtopic ${r.subtopicIndex + 1}`
                           ) : (
-                            <span className="muted-text">Not selected</span>
+                            <span className="muted-text">Unassigned</span>
                           )}
                         </span>
                       </div>
                       <div className="student-card-row">
                         <span className="student-card-key">Role</span>
                         <span className="student-card-val">
-                          {roleMeta ? (
+                          {isLoading ? (
+                            <span className="skeleton-line skeleton-line--sm" />
+                          ) : roleMeta ? (
                             <Badge tone={roleMeta.tone}>{roleMeta.label}</Badge>
                           ) : (
-                            <span className="muted-text">Not selected</span>
+                            <span className="muted-text">Unassigned</span>
                           )}
                         </span>
                       </div>
@@ -736,7 +1036,11 @@ function GroupPage({
               })}
 
               {filteredRows.length === 0 && (
-                <div className="empty-state">No students match “{search}”.</div>
+                <div className="empty-state">
+                  {search.trim()
+                    ? `No students match “${search}”. Try a different name or registration number.`
+                    : `No ${filter === "selected" ? "assigned" : "unassigned"} students in this group yet.`}
+                </div>
               )}
             </div>
           </Card>
@@ -753,7 +1057,7 @@ function GroupPage({
                     <span>Subtopic {o.index + 1}</span>
                   </h2>
                   <Badge tone="neutral" className="tabular">
-                    {o.members.length} selected
+                    {o.members.length} {o.members.length === 1 ? "student" : "students"}
                   </Badge>
                 </div>
 
@@ -779,7 +1083,7 @@ function GroupPage({
                         </ul>
                       ) : (
                         <p className="muted-text" style={{ fontSize: 13 }}>
-                          None yet
+                          No one assigned
                         </p>
                       )}
                     </div>
@@ -788,7 +1092,7 @@ function GroupPage({
                   {o.unassignedRole.length > 0 && (
                     <div>
                       <div className="role-group-head">
-                        <Badge tone="neutral">No role yet</Badge>
+                        <Badge tone="neutral">Role pending</Badge>
                         <span className="mono" style={{ fontSize: 12, color: "var(--color-ink-soft)" }}>
                           {o.unassignedRole.length}
                         </span>
@@ -803,16 +1107,104 @@ function GroupPage({
                       </ul>
                     </div>
                   )}
+
+                  {(() => {
+                    const subMaterials = materials.filter((m) => m.subtopicIndex === o.index);
+                    if (subMaterials.length === 0) return null;
+                    return (
+                      <div className="subtopic-materials-row">
+                        <div className="role-group-head">
+                          <Badge tone="primary">Materials</Badge>
+                          <span className="mono" style={{ fontSize: 12, color: "var(--color-ink-soft)" }}>
+                            {subMaterials.length}
+                          </span>
+                        </div>
+                        <div className="subtopic-material-chips">
+                          {subMaterials.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className="subtopic-material-chip"
+                              onClick={() => setActiveTab("materials")}
+                            >
+                              {m.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </Card>
             ))}
           </section>
         )}
-      </main>
 
-      <Footer />
-      <Toast toast={toast} onDismiss={() => setToast(null)} />
+        {/* Materials View */}
+        {activeTab === "materials" && (
+          <MaterialsTab
+            groupId={groupId}
+            groupName={group.name}
+            isMyGroup={isMyGroup}
+            studentSn={session.studentSn}
+            regNo={session.regNo}
+            defaultSubtopic={myRow?.subtopicIndex ?? null}
+            subtopicOptions={subtopicOptions}
+            materials={materials}
+            storageConfigured={storageConfigured}
+            isLoading={materialsLoading}
+            loadError={materialsError}
+            onRetry={retryMaterials}
+            onAdded={(item) => setMaterials((prev) => [item, ...prev])}
+            onDeleted={(id) => setMaterials((prev) => prev.filter((m) => m.id !== id))}
+            onToast={showToast}
+          />
+        )}
+      </main>
     </div>
+    <Footer />
+    <Toast toast={toast} onDismiss={() => setToast(null)} />
+
+      {/* Mobile Floating "All groups" FAB above Bottom Bar */}
+      <button
+        type="button"
+        className="mobile-fab no-print"
+        onClick={() => navigate("/")}
+      >
+        <span>All groups</span>
+      </button>
+
+      {/* Mobile Bottom Tab Bar */}
+      <nav className="mobile-bottom-bar no-print" aria-label="Group sections">
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${activeTab === "roster" ? "is-active" : ""}`}
+          aria-current={activeTab === "roster" ? "page" : undefined}
+          onClick={() => setActiveTab("roster")}
+        >
+          <UsersIcon size={20} variant={activeTab === "roster" ? "Bold" : "Linear"} />
+          <span>Roster</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${activeTab === "subtopics" ? "is-active" : ""}`}
+          aria-current={activeTab === "subtopics" ? "page" : undefined}
+          onClick={() => setActiveTab("subtopics")}
+        >
+          <BookOpenIcon size={20} variant={activeTab === "subtopics" ? "Bold" : "Linear"} />
+          <span>Subtopics</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${activeTab === "materials" ? "is-active" : ""}`}
+          aria-current={activeTab === "materials" ? "page" : undefined}
+          onClick={() => setActiveTab("materials")}
+        >
+          <FolderIcon size={20} variant={activeTab === "materials" ? "Bold" : "Linear"} />
+          <span>Materials</span>
+        </button>
+      </nav>
+    </>
   );
 }
 
