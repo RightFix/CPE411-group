@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { MaterialsTab } from "./components/MaterialsTab";
 import { Badge, type BadgeTone } from "./components/ui/Badge";
 import { Button } from "./components/ui/Button";
 import { Card } from "./components/ui/Card";
@@ -8,10 +9,13 @@ import {
   BookOpenIcon,
   ChevronDownIcon,
   ChipLogoIcon,
+  FolderIcon,
+  GitHubIcon,
   PrinterIcon,
   SearchIcon,
   UsersIcon,
 } from "./components/ui/Icons";
+import type { MaterialItem } from "./types/materials";
 import { Input } from "./components/ui/Input";
 import { Navbar } from "./components/ui/Navbar";
 import { Select, type SelectOption } from "./components/ui/Select";
@@ -38,7 +42,7 @@ const roles: { id: RoleId; label: string; tone: BadgeTone; description: string }
 type Row = Student & { subtopicIndex: number | null; roleId: RoleId | null };
 type Session = { regNo: string; studentSn: number; groupId: number; name: string };
 type SaveState = { kind: "idle" | "saving" | "saved" | "error"; text: string };
-type GroupTab = "roster" | "subtopics";
+type GroupTab = "roster" | "subtopics" | "materials";
 type RosterFilter = "all" | "selected" | "pending";
 
 const SESSION_KEY = "cpe411_regno";
@@ -90,8 +94,14 @@ function navigate(to: string) {
 function Footer() {
   return (
     <footer className="footer no-print">
-      <a href="https://github.com/RightFix/CPE411-group" target="_blank" rel="noopener noreferrer">
-        Powered by RightFix
+      <a
+        href="https://github.com/RightFix/CPE411-group"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="footer-link"
+      >
+        <GitHubIcon size={16} />
+        <span>Powered by RightFix</span>
       </a>
     </footer>
   );
@@ -322,6 +332,11 @@ function GroupPage({
   const [filter, setFilter] = useState<RosterFilter>("all");
   const [formOpen, setFormOpen] = useState(true);
   const [isEditingSelection, setIsEditingSelection] = useState(false);
+  const [materials, setMaterials] = useState<MaterialItem[]>([]);
+  const [storageConfigured, setStorageConfigured] = useState(true);
+  const [materialsLoading, setMaterialsLoading] = useState(true);
+  const [materialsError, setMaterialsError] = useState<string | null>(null);
+  const [materialsReloadKey, setMaterialsReloadKey] = useState(0);
   const [toast, setToast] = useState<ToastData | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -412,6 +427,35 @@ function GroupPage({
     setLoadError(null);
     setSaveState({ kind: "idle", text: "" });
     setReloadKey((k) => k + 1);
+  };
+
+  useEffect(() => {
+    let alive = true;
+    api<{ materials: MaterialItem[]; storageConfigured?: boolean }>(
+      `/api/groups/${groupId}/materials`
+    )
+      .then((data) => {
+        if (!alive) return;
+        setMaterials(data.materials || []);
+        setStorageConfigured(data.storageConfigured !== false);
+        setMaterialsError(null);
+        setMaterialsLoading(false);
+      })
+      .catch((e: Error) => {
+        if (!alive) return;
+        setMaterialsError(e.message || "Unable to load materials.");
+        setMaterialsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [groupId, materialsReloadKey]);
+
+  const retryMaterials = () => {
+    setMaterialsLoading(true);
+    setMaterialsError(null);
+    setMaterialsReloadKey((k) => k + 1);
   };
 
   const myRow = useMemo(
@@ -812,6 +856,16 @@ function GroupPage({
               <BookOpenIcon size={15} variant={activeTab === "subtopics" ? "Bold" : "Linear"} />
               <span>Subtopic Breakdown</span>
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === "materials"}
+              className={`segmented-btn ${activeTab === "materials" ? "is-active" : ""}`}
+              onClick={() => setActiveTab("materials")}
+            >
+              <FolderIcon size={15} variant={activeTab === "materials" ? "Bold" : "Linear"} />
+              <span>Materials ({materialsLoading ? "…" : materials.length})</span>
+            </button>
           </div>
         </div>
 
@@ -1049,15 +1103,72 @@ function GroupPage({
                       </ul>
                     </div>
                   )}
+
+                  {(() => {
+                    const subMaterials = materials.filter((m) => m.subtopicIndex === o.index);
+                    if (subMaterials.length === 0) return null;
+                    return (
+                      <div className="subtopic-materials-row">
+                        <div className="role-group-head">
+                          <Badge tone="primary">Materials</Badge>
+                          <span className="mono" style={{ fontSize: 12, color: "var(--color-ink-soft)" }}>
+                            {subMaterials.length}
+                          </span>
+                        </div>
+                        <div className="subtopic-material-chips">
+                          {subMaterials.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              className="subtopic-material-chip"
+                              onClick={() => setActiveTab("materials")}
+                            >
+                              {m.title}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </Card>
             ))}
           </section>
         )}
+
+        {/* Materials View */}
+        {activeTab === "materials" && (
+          <MaterialsTab
+            groupId={groupId}
+            groupName={group.name}
+            isMyGroup={isMyGroup}
+            studentSn={session.studentSn}
+            regNo={session.regNo}
+            defaultSubtopic={myRow?.subtopicIndex ?? null}
+            subtopicOptions={subtopicOptions}
+            materials={materials}
+            storageConfigured={storageConfigured}
+            isLoading={materialsLoading}
+            loadError={materialsError}
+            onRetry={retryMaterials}
+            onAdded={(item) => setMaterials((prev) => [item, ...prev])}
+            onDeleted={(id) => setMaterials((prev) => prev.filter((m) => m.id !== id))}
+            onToast={showToast}
+          />
+        )}
       </main>
 
       <Footer />
       <Toast toast={toast} onDismiss={() => setToast(null)} />
+
+      {/* Mobile Floating "All groups" FAB above Bottom Bar */}
+      <button
+        type="button"
+        className="mobile-fab no-print"
+        onClick={() => navigate("/")}
+      >
+        <span>All groups</span>
+      </button>
 
       {/* Mobile Bottom Tab Bar */}
       <nav className="mobile-bottom-bar no-print" aria-label="Group sections">
@@ -1078,6 +1189,15 @@ function GroupPage({
         >
           <BookOpenIcon size={20} variant={activeTab === "subtopics" ? "Bold" : "Linear"} />
           <span>Subtopics</span>
+        </button>
+        <button
+          type="button"
+          className={`mobile-bottom-tab ${activeTab === "materials" ? "is-active" : ""}`}
+          aria-current={activeTab === "materials" ? "page" : undefined}
+          onClick={() => setActiveTab("materials")}
+        >
+          <FolderIcon size={20} variant={activeTab === "materials" ? "Bold" : "Linear"} />
+          <span>Materials</span>
         </button>
       </nav>
     </div>

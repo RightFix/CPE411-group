@@ -46,6 +46,25 @@ export async function ensureSchema() {
         PRIMARY KEY (group_id, student_sn)
       );
       CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
+
+      CREATE TABLE IF NOT EXISTS group_materials (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        group_id INTEGER NOT NULL,
+        student_sn INTEGER NOT NULL,
+        uploader_name TEXT NOT NULL,
+        uploader_reg_no TEXT NOT NULL,
+        subtopic_index INTEGER NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('file', 'link')),
+        title TEXT NOT NULL,
+        note TEXT,
+        storage_path TEXT,
+        file_name TEXT,
+        mime_type TEXT,
+        size_bytes BIGINT,
+        external_url TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_group_materials_group ON group_materials(group_id, created_at DESC);
     `);
   });
 }
