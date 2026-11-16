@@ -1,27 +1,31 @@
-import pg from "pg";
+import { createRequire } from "module";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const { Pool } = pg;
+const require = createRequire(import.meta.url);
+const pg = require("pg") as typeof import("pg");
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __pgPool: pg.Pool | undefined;
+let pool: import("pg").Pool | null = null;
+
+function getConnectionString() {
+  return process.env.DB_URI || process.env.DATABASE_URL || "";
 }
 
 export function getPool() {
-  if (!global.__pgPool) {
-    const connectionString = process.env.DB_URI;
+  if (!pool) {
+    const connectionString = getConnectionString();
     if (!connectionString) throw new Error("DB_URI is not set");
     const needsSsl = !/sslmode=disable/i.test(connectionString) && !/localhost|127\.0\.0\.1/.test(connectionString);
-    global.__pgPool = new Pool({
+    pool = new pg.Pool({
       connectionString,
       ssl: needsSsl ? { rejectUnauthorized: false } : false,
       max: 3,
     });
   }
-  return global.__pgPool;
+  return pool;
 }
 
-export async function withClient<T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+export async function withClient<T>(fn: (client: import("pg").PoolClient) => Promise<T>): Promise<T> {
   const client = await getPool().connect();
   try {
     return await fn(client);
@@ -44,4 +48,14 @@ export async function ensureSchema() {
       CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
     `);
   });
+}
+
+export function loadData() {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const groupsPath = path.join(__dirname, "..", "src", "data", "groups.json");
+  const topicsPath = path.join(__dirname, "..", "src", "data", "topics.json");
+  const fs = require("fs") as typeof import("fs");
+  const groups = JSON.parse(fs.readFileSync(groupsPath, "utf8"));
+  const topics = JSON.parse(fs.readFileSync(topicsPath, "utf8"));
+  return { groups, topics };
 }

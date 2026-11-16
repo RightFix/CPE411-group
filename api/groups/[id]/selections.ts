@@ -1,12 +1,69 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import groups from "../../../src/data/groups.json";
-import topics from "../../../src/data/topics.json";
-import { ensureSchema, withClient } from "../../_db";
+import { createRequire } from "module";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const require = createRequire(import.meta.url);
+const pg = require("pg") as typeof import("pg");
+const fs = require("fs") as typeof import("fs");
+
+type Group = { id: number; name: string; students: { sn: number; name: string; regNo: string }[] };
+type Topic = { id: number; title: string; subtopics: string[] };
 
 const roleIds = new Set(["presenter", "research", "slides"]);
+let pool: import("pg").Pool | null = null;
+let dataCache: { groups: Group[]; topics: Topic[] } | null = null;
+
+function getPool() {
+  if (!pool) {
+    const connectionString = process.env.DB_URI || process.env.DATABASE_URL || "";
+    if (!connectionString) throw new Error("DB_URI is not set");
+    const needsSsl = !/sslmode=disable/i.test(connectionString) && !/localhost|127\.0\.0\.1/.test(connectionString);
+    pool = new pg.Pool({
+      connectionString,
+      ssl: needsSsl ? { rejectUnauthorized: false } : false,
+      max: 3,
+    });
+  }
+  return pool;
+}
+
+async function withClient<T>(fn: (client: import("pg").PoolClient) => Promise<T>): Promise<T> {
+  const client = await getPool().connect();
+  try { return await fn(client); } finally { client.release(); }
+}
+
+async function ensureSchema() {
+  await withClient(async (c) => {
+    await c.query(`
+      CREATE TABLE IF NOT EXISTS group_selections (
+        group_id INTEGER NOT NULL,
+        student_sn INTEGER NOT NULL,
+        subtopic_index INTEGER,
+        role_id TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (group_id, student_sn)
+      );
+      CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
+    `);
+  });
+}
+
+function loadData() {
+  if (dataCache) return dataCache;
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const groupsPath = path.join(__dirname, "..", "..", "_data", "groups.json");
+  const topicsPath = path.join(__dirname, "..", "..", "_data", "topics.json");
+  dataCache = {
+    groups: JSON.parse(fs.readFileSync(groupsPath, "utf8")),
+    topics: JSON.parse(fs.readFileSync(topicsPath, "utf8")),
+  };
+  return dataCache;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    const { groups, topics } = loadData();
     await ensureSchema();
     const groupId = Number(req.query.id);
     if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
@@ -67,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method not allowed" });
   } catch (e: any) {
-    console.error(e);
-    return res.status(500).json({ error: e?.message || "Server error" });
+    console.error("API error:", e);
+    return res.status(500).json({ error: e?.message || "Server error", detail: String(e) });
   }
 }
