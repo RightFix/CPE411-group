@@ -1,4 +1,4 @@
-import topicsJson from "./topics.json";
+import topicsJson from "./topics.json" with { type: "json" };
 
 export type Topic = { id: number; title: string; subtopics: string[] };
 
