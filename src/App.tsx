@@ -1030,7 +1030,7 @@ function GroupPage({
                     <TableHead style={{ width: 155 }}>Reg No</TableHead>
                     <TableHead style={{ width: 220 }}>Subtopic</TableHead>
                     <TableHead style={{ width: 180 }}>Role</TableHead>
-                    <TableHead style={{ width: 90 }}>WhatsApp</TableHead>
+                    <TableHead style={{ width: 90 }} className="no-print">WhatsApp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1075,7 +1075,7 @@ function GroupPage({
                             )}
                           </div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="no-print">
                           <WhatsAppCell value={r.whatsapp} />
                         </TableCell>
                       </TableRow>
