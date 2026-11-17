@@ -1028,9 +1028,9 @@ function GroupPage({
                     <TableHead style={{ width: 64 }}>S/N</TableHead>
                     <TableHead>Student Name</TableHead>
                     <TableHead style={{ width: 155 }}>Reg No</TableHead>
-                    <TableHead style={{ width: 90 }}>WhatsApp</TableHead>
                     <TableHead style={{ width: 220 }}>Subtopic</TableHead>
                     <TableHead style={{ width: 180 }}>Role</TableHead>
+                    <TableHead style={{ width: 90 }}>WhatsApp</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1051,9 +1051,6 @@ function GroupPage({
                           </div>
                         </TableCell>
                         <TableCell className="mono">{r.regNo}</TableCell>
-                        <TableCell>
-                          <WhatsAppCell value={r.whatsapp} />
-                        </TableCell>
                         <TableCell>
                           <span className="print-only">{subtopicPrintLabel(r.subtopicIndex)}</span>
                           <div className="no-print">
@@ -1077,6 +1074,9 @@ function GroupPage({
                               <span className="muted-text">Unassigned</span>
                             )}
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <WhatsAppCell value={r.whatsapp} />
                         </TableCell>
                       </TableRow>
                     );
@@ -1113,16 +1113,6 @@ function GroupPage({
 
                     <div className="student-card-meta">
                       <div className="student-card-row">
-                        <span className="student-card-key">WhatsApp</span>
-                        <span className="student-card-val">
-                          {isLoading ? (
-                            <span className="skeleton-line skeleton-line--sm" />
-                          ) : (
-                            <WhatsAppCell value={r.whatsapp} />
-                          )}
-                        </span>
-                      </div>
-                      <div className="student-card-row">
                         <span className="student-card-key">Subtopic</span>
                         <span className="student-card-val">
                           {isLoading ? (
@@ -1143,6 +1133,16 @@ function GroupPage({
                             <Badge tone={roleMeta.tone}>{roleMeta.label}</Badge>
                           ) : (
                             <span className="muted-text">Unassigned</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="student-card-row">
+                        <span className="student-card-key">WhatsApp</span>
+                        <span className="student-card-val">
+                          {isLoading ? (
+                            <span className="skeleton-line skeleton-line--sm" />
+                          ) : (
+                            <WhatsAppCell value={r.whatsapp} />
                           )}
                         </span>
                       </div>
