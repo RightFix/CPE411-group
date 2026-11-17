@@ -7,25 +7,35 @@ const topics = require("../src/data/topics.json") as { id: number; title: string
 
 const roleIds = new Set(["presenter", "research", "slides"]);
 
+function normalizeWhatsapp(raw: unknown): { error?: string; value: string | null } {
+  const s = String(raw ?? "").trim();
+  if (!s) return { value: null };
+  if (!/^\+?[\d\s\-()]{7,20}$/.test(s)) return { error: "Invalid WhatsApp number." };
+  const digits = s.replace(/[^\d]/g, "");
+  if (digits.length < 7 || digits.length > 15) return { error: "Invalid WhatsApp number." };
+  return { value: s.replace(/\s+/g, " ") };
+}
+
 export async function getGroupSelections(groupId: number) {
   const group = groups.find(g => g.id === groupId);
   const topic = topics.find(t => t.id === groupId);
   if (!group || !topic) return null;
   return withClient(async (c) => {
     const res = await c.query(
-      "SELECT student_sn, subtopic_index, role_id FROM group_selections WHERE group_id = $1",
+      "SELECT student_sn, subtopic_index, role_id, whatsapp FROM group_selections WHERE group_id = $1",
       [groupId]
     );
-    const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null }>();
+    const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null; whatsapp: string | null }>();
     for (const row of res.rows) {
       const idx = row.subtopic_index == null ? null : Number(row.subtopic_index);
       bySn.set(Number(row.student_sn), {
         subtopicIndex: idx != null && idx >= 0 && idx < topic.subtopics.length ? idx : null,
         roleId: typeof row.role_id === "string" && roleIds.has(row.role_id) ? row.role_id : null,
+        whatsapp: typeof row.whatsapp === "string" && row.whatsapp ? row.whatsapp : null,
       });
     }
     return group.students.map(s => ({
-      ...bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null },
+      ...bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null, whatsapp: null },
       sn: s.sn,
     }));
   });
@@ -36,7 +46,8 @@ export async function setGroupSelection(
   studentSn: number,
   subtopicIndex: number | null,
   roleId: string | null,
-  regNo?: string
+  regNo?: string,
+  whatsapp?: string
 ) {
   const group = groups.find(g => g.id === groupId);
   const topic = topics.find(t => t.id === groupId);
@@ -52,14 +63,16 @@ export async function setGroupSelection(
     return { status: 400, body: { error: "Invalid subtopic." } };
   }
   if (roleId != null && !roleIds.has(roleId)) return { status: 400, body: { error: "Invalid role." } };
+  const wa = normalizeWhatsapp(whatsapp);
+  if (wa.error) return { status: 400, body: { error: wa.error } };
 
   await withClient(async (c) => {
     await c.query(
-      `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, updated_at)
-       VALUES ($1,$2,$3,$4,NOW())
+      `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, whatsapp, updated_at)
+       VALUES ($1,$2,$3,$4,$5,NOW())
        ON CONFLICT (group_id, student_sn)
-       DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, updated_at = NOW()`,
-      [groupId, studentSn, subtopicIndex, roleId]
+       DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, whatsapp = EXCLUDED.whatsapp, updated_at = NOW()`,
+      [groupId, studentSn, subtopicIndex, roleId, wa.value]
     );
   });
   const selections = await getGroupSelections(groupId);

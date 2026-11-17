@@ -16,7 +16,7 @@ const roleLabel: Record<string, string> = { presenter: "Presenter", research: "R
 
 async function main() {
   await ensureSchema();
-  const rows = await withClient(async (c) => (await c.query("SELECT group_id, student_sn, subtopic_index, role_id FROM group_selections")).rows);
+  const rows = await withClient(async (c) => (await c.query("SELECT group_id, student_sn, subtopic_index, role_id, whatsapp FROM group_selections")).rows);
   const sel = new Map<string, any>();
   for (const r of rows) sel.set(`${r.group_id}:${r.student_sn}`, r);
 

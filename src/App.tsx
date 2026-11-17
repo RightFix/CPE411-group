@@ -39,7 +39,11 @@ const roles: { id: RoleId; label: string; tone: BadgeTone; description: string }
   { id: "slides", label: "Slide Creator", tone: "violet", description: "Designs and structures the deck" },
 ];
 
-type Row = Student & { subtopicIndex: number | null; roleId: RoleId | null };
+type Row = Student & {
+  subtopicIndex: number | null;
+  roleId: RoleId | null;
+  whatsapp: string | null;
+};
 type Session = { regNo: string; studentSn: number; groupId: number; name: string };
 type SaveState = { kind: "idle" | "saving" | "saved" | "error"; text: string };
 type GroupTab = "roster" | "subtopics" | "materials";
@@ -89,6 +93,53 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
 function navigate(to: string) {
   window.history.pushState({}, "", to);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+/** Digits only from a stored phone string. */
+function waDigits(raw: string): string {
+  return raw.replace(/\D/g, "");
+}
+
+/**
+ * Build a wa.me link from a Nigerian phone number.
+ * 0801 234 5678 → 2348012345678 (leading 0 swapped for 234).
+ * +234… / 234… are passed through as-is.
+ */
+function waMeHref(raw: string): string | null {
+  const d = waDigits(raw);
+  if (d.length < 10 || d.length > 14) return null;
+  const national = d.startsWith("234") ? d : d.startsWith("0") ? `234${d.slice(1)}` : null;
+  if (!national || national.length < 13) return null;
+  return `https://wa.me/${national}`;
+}
+
+/** Client-side validation matching the API rule. Returns an error message or null. */
+function validateWhatsapp(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  if (!/^\+?[\d\s\-()]{7,20}$/.test(s)) return "Enter a valid Nigerian number, e.g. 0801 234 5678.";
+  const d = waDigits(s);
+  if (d.length < 10 || d.length > 14) return "Enter a valid Nigerian number, e.g. 0801 234 5678.";
+  return null;
+}
+
+/** WhatsApp icon that opens a chat. Shows "—" when no number is saved. */
+function WhatsAppCell({ value }: { value: string | null }) {
+  if (!value) return <span className="muted-text">—</span>;
+  const href = waMeHref(value);
+  if (!href) return <span className="muted-text">—</span>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="wa-link"
+      title={`Chat on WhatsApp: ${value}`}
+      aria-label={`Chat on WhatsApp: ${value}`}
+    >
+      <img src="/whatsapp.webp" alt="" className="wa-icon" width={20} height={20} />
+    </a>
+  );
 }
 
 function Footer() {
@@ -322,10 +373,11 @@ function GroupPage({
   const topic = topics.find((t) => t.id === groupId)!;
 
   const [rows, setRows] = useState<Row[]>(() =>
-    group.students.map((s) => ({ ...s, subtopicIndex: null, roleId: null }))
+    group.students.map((s) => ({ ...s, subtopicIndex: null, roleId: null, whatsapp: null }))
   );
   const [draftSubtopic, setDraftSubtopic] = useState<number | null>(null);
   const [draftRole, setDraftRole] = useState<RoleId | null>(null);
+  const [draftWhatsapp, setDraftWhatsapp] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle", text: "" });
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -389,9 +441,14 @@ function GroupPage({
   useEffect(() => {
     let alive = true;
 
-    api<{ selections: { sn: number; subtopicIndex: number | null; roleId: RoleId | null }[] }>(
-      `/api/groups/${groupId}/selections`
-    )
+    api<{
+      selections: {
+        sn: number;
+        subtopicIndex: number | null;
+        roleId: RoleId | null;
+        whatsapp: string | null;
+      }[];
+    }>(`/api/groups/${groupId}/selections`)
       .then((data) => {
         if (!alive) return;
         const bySn = new Map(data.selections.map((s) => [s.sn, s]));
@@ -399,6 +456,7 @@ function GroupPage({
           ...s,
           subtopicIndex: bySn.get(s.sn)?.subtopicIndex ?? null,
           roleId: (bySn.get(s.sn)?.roleId as RoleId | null) ?? null,
+          whatsapp: bySn.get(s.sn)?.whatsapp ?? null,
         }));
         setRows(loadedRows);
         if (isMyGroup) {
@@ -407,6 +465,7 @@ function GroupPage({
           const role = mine?.roleId ?? null;
           setDraftSubtopic(sub);
           setDraftRole(role);
+          setDraftWhatsapp(mine?.whatsapp ?? "");
           setIsEditingSelection(sub == null || role == null);
         }
         setLoadError(null);
@@ -466,18 +525,23 @@ function GroupPage({
     [isMyGroup, rows, session.studentSn]
   );
 
+  const whatsappError = validateWhatsapp(draftWhatsapp);
   const isDirty =
-    myRow != null && (draftSubtopic !== myRow.subtopicIndex || draftRole !== myRow.roleId);
+    myRow != null &&
+    (draftSubtopic !== myRow.subtopicIndex ||
+      draftRole !== myRow.roleId ||
+      draftWhatsapp.trim() !== (myRow.whatsapp ?? ""));
   const canSubmit =
     isMyGroup &&
     draftSubtopic != null &&
     draftRole != null &&
     isDirty &&
+    !whatsappError &&
     saveState.kind !== "saving";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isMyGroup || draftSubtopic == null || draftRole == null) return;
+    if (!isMyGroup || draftSubtopic == null || draftRole == null || whatsappError) return;
     try {
       setSaveState({ kind: "saving", text: "Submitting…" });
       await api(`/api/groups/${groupId}/selections`, {
@@ -487,12 +551,18 @@ function GroupPage({
           subtopicIndex: draftSubtopic,
           roleId: draftRole,
           regNo: session.regNo,
+          whatsapp: draftWhatsapp.trim(),
         }),
       });
       setRows((prev) =>
         prev.map((r) =>
           r.sn === session.studentSn
-            ? { ...r, subtopicIndex: draftSubtopic, roleId: draftRole }
+            ? {
+                ...r,
+                subtopicIndex: draftSubtopic,
+                roleId: draftRole,
+                whatsapp: draftWhatsapp.trim() || null,
+              }
             : r
         )
       );
@@ -523,7 +593,9 @@ function GroupPage({
       if (filter === "selected" && r.subtopicIndex == null) return false;
       if (filter === "pending" && r.subtopicIndex != null) return false;
       if (!q) return true;
-      return r.name.toLowerCase().includes(q) || r.regNo.toLowerCase().includes(q);
+      const qDigits = q.replace(/\D/g, "");
+      const waMatch = qDigits !== "" && waDigits(r.whatsapp ?? "").includes(qDigits);
+      return r.name.toLowerCase().includes(q) || r.regNo.toLowerCase().includes(q) || waMatch;
     });
   }, [rows, search, filter]);
 
@@ -678,6 +750,7 @@ function GroupPage({
                       onClick={() => {
                         setDraftSubtopic(myRow.subtopicIndex);
                         setDraftRole(myRow.roleId);
+                        setDraftWhatsapp(myRow.whatsapp ?? "");
                         setIsEditingSelection(true);
                         setFormOpen(true);
                       }}
@@ -699,6 +772,20 @@ function GroupPage({
                     <div style={{ marginTop: 6 }}>
                       {savedRoleMeta && (
                         <Badge tone={savedRoleMeta.tone}>{savedRoleMeta.label}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <div className="my-selection-summary-box">
+                    <span className="stat-shell-label">WhatsApp</span>
+                    <div style={{ marginTop: 6 }}>
+                      {myRow.whatsapp ? (
+                        <span className="mono" style={{ fontSize: 13 }}>
+                          {myRow.whatsapp}
+                        </span>
+                      ) : (
+                        <span className="muted-text" style={{ fontSize: 13 }}>
+                          Not added
+                        </span>
                       )}
                     </div>
                   </div>
@@ -765,6 +852,21 @@ function GroupPage({
                         disabled={!!loadError}
                         onChange={(val) => setDraftRole(val)}
                       />
+                      <Input
+                        label="WhatsApp number"
+                        type="tel"
+                        inputMode="tel"
+                        value={draftWhatsapp}
+                        onChange={(e) => setDraftWhatsapp(e.target.value)}
+                        placeholder="e.g. 0801 234 5678"
+                        autoComplete="tel"
+                        disabled={!!loadError}
+                        error={whatsappError ?? undefined}
+                        hint="Optional — others reach you via the WhatsApp icon in the roster."
+                        leadingIcon={
+                          <img src="/whatsapp.webp" alt="" className="wa-input-icon" width={16} height={16} />
+                        }
+                      />
                     </div>
 
                     {draftSubtopic != null && (
@@ -790,6 +892,7 @@ function GroupPage({
                             onClick={() => {
                               setDraftSubtopic(myRow.subtopicIndex);
                               setDraftRole(myRow.roleId);
+                              setDraftWhatsapp(myRow.whatsapp ?? "");
                               setIsEditingSelection(false);
                             }}
                           >
@@ -926,6 +1029,7 @@ function GroupPage({
                     <TableHead style={{ width: 64 }}>S/N</TableHead>
                     <TableHead>Student Name</TableHead>
                     <TableHead style={{ width: 155 }}>Reg No</TableHead>
+                    <TableHead style={{ width: 90 }}>WhatsApp</TableHead>
                     <TableHead style={{ width: 220 }}>Subtopic</TableHead>
                     <TableHead style={{ width: 180 }}>Role</TableHead>
                   </TableRow>
@@ -948,6 +1052,9 @@ function GroupPage({
                           </div>
                         </TableCell>
                         <TableCell className="mono">{r.regNo}</TableCell>
+                        <TableCell>
+                          <WhatsAppCell value={r.whatsapp} />
+                        </TableCell>
                         <TableCell>
                           <span className="print-only">{subtopicPrintLabel(r.subtopicIndex)}</span>
                           <div className="no-print">
@@ -1006,6 +1113,16 @@ function GroupPage({
                     </div>
 
                     <div className="student-card-meta">
+                      <div className="student-card-row">
+                        <span className="student-card-key">WhatsApp</span>
+                        <span className="student-card-val">
+                          {isLoading ? (
+                            <span className="skeleton-line skeleton-line--sm" />
+                          ) : (
+                            <WhatsAppCell value={r.whatsapp} />
+                          )}
+                        </span>
+                      </div>
                       <div className="student-card-row">
                         <span className="student-card-key">Subtopic</span>
                         <span className="student-card-val">

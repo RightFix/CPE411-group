@@ -32,13 +32,14 @@ app.post("/api/groups/:id/selections", async (req, res) => {
   try {
     const groupId = Number(req.params.id);
     if (!Number.isInteger(groupId)) return res.status(400).json({ error: "Invalid group id." });
-    const { studentSn, subtopicIndex, roleId, regNo } = req.body || {};
+    const { studentSn, subtopicIndex, roleId, regNo, whatsapp } = req.body || {};
     const out = await setGroupSelection(
       groupId,
       Number(studentSn),
       subtopicIndex === null || subtopicIndex === undefined ? null : Number(subtopicIndex),
       roleId ?? null,
-      regNo
+      regNo,
+      whatsapp
     );
     res.status(out.status).json(out.body);
   } catch (e: any) {

@@ -46,6 +46,7 @@ export async function ensureSchema() {
         PRIMARY KEY (group_id, student_sn)
       );
       CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
+      ALTER TABLE group_selections ADD COLUMN IF NOT EXISTS whatsapp TEXT;
 
       CREATE TABLE IF NOT EXISTS group_materials (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

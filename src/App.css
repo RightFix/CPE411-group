@@ -1358,7 +1358,7 @@
 
 .my-selection-summary-grid {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: 1.6fr 1fr 1fr;
   gap: var(--space-sm);
 }
 
@@ -1384,8 +1384,36 @@
 
 .my-selection-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1.1fr;
   gap: var(--space-md);
+}
+
+/* WhatsApp icon link in roster / cards */
+.wa-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  border-radius: var(--radius-pill);
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.wa-link:hover {
+  opacity: 0.75;
+}
+
+.wa-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: inline-block;
+}
+
+.wa-input-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  display: block;
 }
 
 .my-selection-preview {

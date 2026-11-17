@@ -11,6 +11,21 @@ type Group = { id: number; name: string; students: { sn: number; name: string; r
 type Topic = { id: number; title: string; subtopics: string[] };
 
 const roleIds = new Set(["presenter", "research", "slides"]);
+
+/** Normalize a phone string to digits only. */
+function toDigits(v: string) {
+  return v.replace(/[^\d]/g, "");
+}
+
+/** Validate an optional WhatsApp number (Nigerian formats expected). Returns normalized stored value or null. */
+function normalizeWhatsapp(raw: unknown): { error?: string; value: string | null } {
+  const s = String(raw ?? "").trim();
+  if (!s) return { value: null };
+  if (!/^\+?[\d\s\-()]{7,20}$/.test(s)) return { error: "Invalid WhatsApp number." };
+  const digits = toDigits(s);
+  if (digits.length < 7 || digits.length > 15) return { error: "Invalid WhatsApp number." };
+  return { value: s.replace(/\s+/g, " ") };
+}
 let pool: import("pg").Pool | null = null;
 let dataCache: { groups: Group[]; topics: Topic[] } | null = null;
 
@@ -57,6 +72,7 @@ async function ensureSchema() {
         PRIMARY KEY (group_id, student_sn)
       );
       CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
+      ALTER TABLE group_selections ADD COLUMN IF NOT EXISTS whatsapp TEXT;
     `);
   });
 }
@@ -85,17 +101,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (req.method === "GET") {
       const rows = await withClient(async (c) =>
-        (await c.query("SELECT student_sn, subtopic_index, role_id FROM group_selections WHERE group_id = $1", [groupId])).rows
+        (await c.query("SELECT student_sn, subtopic_index, role_id, whatsapp FROM group_selections WHERE group_id = $1", [groupId])).rows
       );
-      const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null }>();
+      const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null; whatsapp: string | null }>();
       for (const row of rows) {
         const idx = row.subtopic_index == null ? null : Number(row.subtopic_index);
         bySn.set(Number(row.student_sn), {
           subtopicIndex: idx != null && idx >= 0 && idx < topic.subtopics.length ? idx : null,
           roleId: typeof row.role_id === "string" && roleIds.has(row.role_id) ? row.role_id : null,
+          whatsapp: typeof row.whatsapp === "string" && row.whatsapp ? row.whatsapp : null,
         });
       }
-      const selections = group.students.map(s => ({ sn: s.sn, ...(bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null }) }));
+      const selections = group.students.map(s => ({ sn: s.sn, ...(bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null, whatsapp: null }) }));
       return res.status(200).json({ selections });
     }
 
@@ -115,27 +132,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: "Invalid subtopic." });
       }
       if (roleId != null && !roleIds.has(roleId)) return res.status(400).json({ error: "Invalid role." });
+      const wa = normalizeWhatsapp(body.whatsapp);
+      if (wa.error) return res.status(400).json({ error: wa.error });
       await withClient(async (c) => {
         await c.query(
-          `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, updated_at)
-           VALUES ($1,$2,$3,$4,NOW())
+          `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, whatsapp, updated_at)
+           VALUES ($1,$2,$3,$4,$5,NOW())
            ON CONFLICT (group_id, student_sn)
-           DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, updated_at = NOW()`,
-          [groupId, studentSn, subtopicIndex, roleId]
+           DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, whatsapp = EXCLUDED.whatsapp, updated_at = NOW()`,
+          [groupId, studentSn, subtopicIndex, roleId, wa.value]
         );
       });
       const rows = await withClient(async (c) =>
-        (await c.query("SELECT student_sn, subtopic_index, role_id FROM group_selections WHERE group_id = $1", [groupId])).rows
+        (await c.query("SELECT student_sn, subtopic_index, role_id, whatsapp FROM group_selections WHERE group_id = $1", [groupId])).rows
       );
-      const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null }>();
+      const bySn = new Map<number, { subtopicIndex: number | null; roleId: string | null; whatsapp: string | null }>();
       for (const row of rows) {
         const idx = row.subtopic_index == null ? null : Number(row.subtopic_index);
         bySn.set(Number(row.student_sn), {
           subtopicIndex: idx != null && idx >= 0 && idx < topic.subtopics.length ? idx : null,
           roleId: typeof row.role_id === "string" && roleIds.has(row.role_id) ? row.role_id : null,
+          whatsapp: typeof row.whatsapp === "string" && row.whatsapp ? row.whatsapp : null,
         });
       }
-      const selections = group.students.map(s => ({ sn: s.sn, ...(bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null }) }));
+      const selections = group.students.map(s => ({ sn: s.sn, ...(bySn.get(s.sn) ?? { subtopicIndex: null, roleId: null, whatsapp: null }) }));
       return res.status(200).json({ selections });
     }
 
