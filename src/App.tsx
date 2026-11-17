@@ -862,7 +862,6 @@ function GroupPage({
                         autoComplete="tel"
                         disabled={!!loadError}
                         error={whatsappError ?? undefined}
-                        hint="Optional — others reach you via the WhatsApp icon in the roster."
                         leadingIcon={
                           <img src="/whatsapp.webp" alt="" className="wa-input-icon" width={16} height={16} />
                         }
