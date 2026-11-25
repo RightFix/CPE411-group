@@ -6,6 +6,8 @@ export interface SelectOption<T extends string | number = string> {
   label: string;
   description?: string;
   prefix?: string;
+  disabled?: boolean;
+  disabledReason?: string;
 }
 
 export interface SelectProps<T extends string | number = string> {
@@ -18,6 +20,21 @@ export interface SelectProps<T extends string | number = string> {
   compact?: boolean;
   onChange: (value: T) => void;
   className?: string;
+}
+
+/** Next enabled option index in `dir` direction, wrapping around. Skips disabled options. */
+function nextEnabled<T extends string | number>(
+  options: SelectOption<T>[],
+  from: number,
+  dir: 1 | -1
+): number {
+  if (options.length === 0) return -1;
+  let idx = from;
+  for (let i = 0; i < options.length; i++) {
+    idx = (idx + dir + options.length) % options.length;
+    if (!options[idx].disabled) return idx;
+  }
+  return from;
 }
 
 export function Select<T extends string | number = string>({
@@ -55,11 +72,11 @@ export function Select<T extends string | number = string>({
         triggerRef.current?.focus();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setActiveIndex((prev) => (prev + 1) % options.length);
+        setActiveIndex((prev) => nextEnabled(options, prev, 1));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setActiveIndex((prev) => (prev - 1 + options.length) % options.length);
-      } else if (e.key === "Enter" && activeIndex >= 0 && options[activeIndex]) {
+        setActiveIndex((prev) => nextEnabled(options, prev, -1));
+      } else if (e.key === "Enter" && activeIndex >= 0 && options[activeIndex] && !options[activeIndex].disabled) {
         e.preventDefault();
         onChange(options[activeIndex].value);
         setOpen(false);
@@ -83,7 +100,7 @@ export function Select<T extends string | number = string>({
       const next = !prev;
       if (next) {
         const idx = options.findIndex((o) => o.value === value);
-        setActiveIndex(idx >= 0 ? idx : 0);
+        setActiveIndex(idx >= 0 && !options[idx].disabled ? idx : nextEnabled(options, idx, 1));
       }
       return next;
     });
@@ -131,27 +148,32 @@ export function Select<T extends string | number = string>({
             {options.map((opt, idx) => {
               const isSelected = opt.value === value;
               const isHighlighted = idx === activeIndex;
+              const isDisabled = !!opt.disabled;
               return (
                 <button
                   key={String(opt.value)}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  onMouseEnter={() => setActiveIndex(idx)}
+                  aria-disabled={isDisabled || undefined}
+                  onMouseEnter={() => !isDisabled && setActiveIndex(idx)}
                   onClick={() => {
+                    if (isDisabled) return;
                     onChange(opt.value);
                     setOpen(false);
                     triggerRef.current?.focus();
                   }}
-                  className={`ui-select-option ${isSelected ? "is-selected" : ""} ${isHighlighted ? "is-highlighted" : ""}`.trim()}
+                  className={`ui-select-option ${isSelected ? "is-selected" : ""} ${isHighlighted && !isDisabled ? "is-highlighted" : ""} ${isDisabled ? "is-disabled" : ""}`.trim()}
                 >
                   <span className="ui-select-option-body">
                     <span className="ui-select-option-title">
                       {opt.prefix && <span className="ui-select-prefix">{opt.prefix}</span>}
                       <span>{opt.label}</span>
                     </span>
-                    {opt.description && (
-                      <span className="ui-select-option-desc">{opt.description}</span>
+                    {(opt.description || (isDisabled && opt.disabledReason)) && (
+                      <span className="ui-select-option-desc">
+                        {isDisabled && opt.disabledReason ? opt.disabledReason : opt.description}
+                      </span>
                     )}
                   </span>
                   {isSelected && <CheckIcon size={15} className="ui-select-check" />}

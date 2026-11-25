@@ -739,6 +739,24 @@
   background-color: rgba(0, 103, 245, 0.08);
 }
 
+.ui-select-option.is-disabled,
+.ui-select-option.is-disabled.is-highlighted,
+.ui-select-option.is-disabled:hover {
+  background: transparent;
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ui-select-option.is-disabled .ui-select-option-title {
+  color: var(--color-ink-soft);
+  font-weight: 500;
+}
+
+.ui-select-option.is-disabled .ui-select-option-desc {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
 .ui-select-option-body {
   display: flex;
   flex-direction: column;
@@ -1428,6 +1446,12 @@
 
 .my-selection-preview strong {
   color: var(--color-ink);
+}
+
+.my-selection-role-counts {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--color-ink-soft);
 }
 
 .my-selection-actions {

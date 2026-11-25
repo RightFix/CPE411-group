@@ -26,6 +26,56 @@ function normalizeWhatsapp(raw: unknown): { error?: string; value: string | null
   if (digits.length < 7 || digits.length > 15) return { error: "Invalid WhatsApp number." };
   return { value: s.replace(/\s+/g, " ") };
 }
+
+type SelectionRow = { sn: number; sub: number | null; role: string | null };
+
+/**
+ * Enforce per-subtopic role rules:
+ *  1. at most one presenter;
+ *  2. researchers and slide creators stay balanced (a move that leaves
+ *     |research − slides| > 1 is rejected unless it reduces the imbalance).
+ * An unchanged (subtopic, role) pair is always allowed (e.g. WhatsApp-only saves).
+ */
+function validateRoleAssignment(
+  rows: SelectionRow[],
+  studentSn: number,
+  sub: number | null,
+  role: string | null,
+  names: Map<number, string>
+): { error?: string } {
+  if (sub == null || role == null) return {};
+  const own = rows.find((r) => r.sn === studentSn);
+  if (own && own.sub === sub && own.role === role) return {};
+
+  if (role === "presenter") {
+    const holder = rows.find((r) => r.sn !== studentSn && r.sub === sub && r.role === "presenter");
+    if (holder) {
+      const name = names.get(holder.sn) ?? "another student";
+      return { error: `Subtopic ${sub + 1} already has a presenter (${name}).` };
+    }
+    return {};
+  }
+
+  if (role === "research" || role === "slides") {
+    let research = 0;
+    let slides = 0;
+    for (const r of rows) {
+      if (r.sn === studentSn || r.sub !== sub) continue;
+      if (r.role === "research") research++;
+      else if (r.role === "slides") slides++;
+    }
+    const imbalance = Math.abs(research - slides);
+    const after = Math.abs(
+      research + (role === "research" ? 1 : 0) - slides - (role === "slides" ? 1 : 0)
+    );
+    if (after > 1 && after >= imbalance) {
+      return {
+        error: `Subtopic ${sub + 1} needs researchers and slide creators roughly even — pick the other role.`,
+      };
+    }
+  }
+  return {};
+}
 let pool: import("pg").Pool | null = null;
 let dataCache: { groups: Group[]; topics: Topic[] } | null = null;
 
@@ -73,6 +123,9 @@ async function ensureSchema() {
       );
       CREATE INDEX IF NOT EXISTS idx_group_selections_group ON group_selections(group_id);
       ALTER TABLE group_selections ADD COLUMN IF NOT EXISTS whatsapp TEXT;
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_group_selections_one_presenter
+        ON group_selections(group_id, subtopic_index)
+        WHERE role_id = 'presenter' AND subtopic_index IS NOT NULL;
     `);
   });
 }
@@ -134,15 +187,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (roleId != null && !roleIds.has(roleId)) return res.status(400).json({ error: "Invalid role." });
       const wa = normalizeWhatsapp(body.whatsapp);
       if (wa.error) return res.status(400).json({ error: wa.error });
-      await withClient(async (c) => {
-        await c.query(
-          `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, whatsapp, updated_at)
-           VALUES ($1,$2,$3,$4,$5,NOW())
-           ON CONFLICT (group_id, student_sn)
-           DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, whatsapp = EXCLUDED.whatsapp, updated_at = NOW()`,
-          [groupId, studentSn, subtopicIndex, roleId, wa.value]
-        );
-      });
+
+      // Role rules (presenter uniqueness + research/slides balance).
+      const current = await withClient(async (c) =>
+        (await c.query("SELECT student_sn, subtopic_index, role_id FROM group_selections WHERE group_id = $1", [groupId])).rows
+      );
+      const currentRows: SelectionRow[] = current.map((r) => ({
+        sn: Number(r.student_sn),
+        sub: r.subtopic_index == null ? null : Number(r.subtopic_index),
+        role: typeof r.role_id === "string" ? r.role_id : null,
+      }));
+      const names = new Map(group.students.map((s) => [s.sn, s.name] as const));
+      const violation = validateRoleAssignment(currentRows, studentSn, subtopicIndex, roleId, names);
+      if (violation.error) return res.status(409).json({ error: violation.error });
+
+      try {
+        await withClient(async (c) => {
+          await c.query(
+            `INSERT INTO group_selections (group_id, student_sn, subtopic_index, role_id, whatsapp, updated_at)
+             VALUES ($1,$2,$3,$4,$5,NOW())
+             ON CONFLICT (group_id, student_sn)
+             DO UPDATE SET subtopic_index = EXCLUDED.subtopic_index, role_id = EXCLUDED.role_id, whatsapp = EXCLUDED.whatsapp, updated_at = NOW()`,
+            [groupId, studentSn, subtopicIndex, roleId, wa.value]
+          );
+        });
+      } catch (e: any) {
+        // Partial unique index backstop: two presenters saved concurrently.
+        if (e?.code === "23505" && roleId === "presenter") {
+          return res.status(409).json({ error: `Subtopic ${subtopicIndex + 1} already has a presenter.` });
+        }
+        throw e;
+      }
       const rows = await withClient(async (c) =>
         (await c.query("SELECT student_sn, subtopic_index, role_id, whatsapp FROM group_selections WHERE group_id = $1", [groupId])).rows
       );

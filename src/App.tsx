@@ -428,15 +428,62 @@ function GroupPage({
     [topic]
   );
 
-  const roleOptions: SelectOption<RoleId>[] = useMemo(
-    () =>
-      roles.map((r) => ({
-        value: r.id,
-        label: r.label,
-        description: r.description,
-      })),
-    []
+  const myRow = useMemo(
+    () => (isMyGroup ? rows.find((r) => r.sn === session.studentSn) ?? null : null),
+    [isMyGroup, rows, session.studentSn]
   );
+
+  /**
+   * Role availability for the draft subtopic.
+   * - Presenter: at most one per subtopic (disabled when someone else holds it).
+   * - Researchers / slide creators: kept balanced — an option is disabled only
+   *   when picking it would leave |research − slides| > 1 without improving the
+   *   current imbalance. That way existing unbalanced subtopics can heal and
+   *   there is always at least one valid choice.
+   * The user's own current (subtopic, role) is never disabled, so a
+   * WhatsApp-only save on an unchanged selection still works.
+   */
+  const roleGating = useMemo(() => {
+    const sub = draftSubtopic;
+    const unchanged = myRow != null && sub === myRow.subtopicIndex && draftRole === myRow.roleId;
+
+    // Counts of OTHER students in the draft subtopic (my own row excluded).
+    let presenterName: string | null = null;
+    let research = 0;
+    let slides = 0;
+    if (sub != null) {
+      for (const r of rows) {
+        if (r.sn === session.studentSn || r.subtopicIndex !== sub) continue;
+        if (r.roleId === "presenter") presenterName = r.name;
+        else if (r.roleId === "research") research++;
+        else if (r.roleId === "slides") slides++;
+      }
+    }
+    const imbalance = Math.abs(research - slides);
+
+    const options: SelectOption<RoleId>[] = roles.map((r) => {
+      let disabled = false;
+      let disabledReason: string | undefined;
+      if (!unchanged && sub != null) {
+        if (r.id === "presenter" && presenterName) {
+          disabled = true;
+          disabledReason = `Taken by ${presenterName}`;
+        } else if (r.id === "research" || r.id === "slides") {
+          const after = Math.abs(research + (r.id === "research" ? 1 : 0) - slides - (r.id === "slides" ? 1 : 0));
+          if (after > 1 && after >= imbalance) {
+            disabled = true;
+            disabledReason = "Would leave this subtopic unbalanced";
+          }
+        }
+      }
+      return { value: r.id, label: r.label, description: r.description, disabled, disabledReason };
+    });
+
+    return { options, presenterName, research, slides, imbalance };
+  }, [rows, draftSubtopic, draftRole, myRow, session.studentSn]);
+
+  const roleOptions = roleGating.options;
+  const selectedRoleBlocked = draftRole != null && (roleOptions.find((o) => o.value === draftRole)?.disabled ?? false);
 
   useEffect(() => {
     let alive = true;
@@ -520,11 +567,6 @@ function GroupPage({
     setMaterialsReloadKey((k) => k + 1);
   };
 
-  const myRow = useMemo(
-    () => (isMyGroup ? rows.find((r) => r.sn === session.studentSn) ?? null : null),
-    [isMyGroup, rows, session.studentSn]
-  );
-
   const whatsappError = validateWhatsapp(draftWhatsapp);
   const isDirty =
     myRow != null &&
@@ -537,11 +579,12 @@ function GroupPage({
     draftRole != null &&
     isDirty &&
     !whatsappError &&
+    !selectedRoleBlocked &&
     saveState.kind !== "saving";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isMyGroup || draftSubtopic == null || draftRole == null || whatsappError) return;
+    if (!isMyGroup || draftSubtopic == null || draftRole == null || whatsappError || selectedRoleBlocked) return;
     try {
       setSaveState({ kind: "saving", text: "Submitting…" });
       await api(`/api/groups/${groupId}/selections`, {
@@ -872,16 +915,22 @@ function GroupPage({
                       <div className="my-selection-preview">
                         <strong>Subtopic {draftSubtopic + 1}:</strong>{" "}
                         {topic.subtopics[draftSubtopic]}
+                        <div className="my-selection-role-counts">
+                          Presenter: {roleGating.presenterName ?? "none"} · Research:{" "}
+                          {roleGating.research} · Slide Creator: {roleGating.slides}
+                        </div>
                       </div>
                     )}
 
                     <div className="my-selection-actions">
                       <span className="my-selection-hint">
-                        {draftSubtopic == null || draftRole == null
-                          ? "Pick both a subtopic and a role, then save."
-                          : isDirty
-                            ? "Ready to save your changes."
-                            : `Saved to ${group.name}.`}
+                        {selectedRoleBlocked
+                          ? "That role isn't available here — pick another one."
+                          : draftSubtopic == null || draftRole == null
+                            ? "Pick both a subtopic and a role, then save."
+                            : isDirty
+                              ? "Ready to save your changes."
+                              : `Saved to ${group.name}.`}
                       </span>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {hasSavedSelection && (
